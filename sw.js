@@ -1,5 +1,5 @@
 /* Kabu service worker: the app works offline with the last prices it saw. Never caches the bridge. */
-const CACHE = 'kabu-v1';
+const CACHE = 'kabu-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
