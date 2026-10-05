@@ -263,6 +263,45 @@ ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column;
 .flabel { font-size: 13px; line-height: 1.3; color: var(--ink-2); }
 .field .hint { margin-top: -1px; }
 .order.with-action .link { padding: 0 0 0 8px; min-height: 32px; }
+
+/* ---- v5: dashboard + unfolded layout ---- */
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.kpi { display: flex; flex-direction: column; gap: 3px; text-align: left; background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; min-width: 0; box-shadow: var(--shadow); }
+@media (max-width: 719px) { .kpis > .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+.kpi .kv-big { font-size: 21px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-sub { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alerts { display: flex; flex-direction: column; }
+.alert { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-top: 1px solid var(--rule); font-size: 13.5px; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; width: 100%; }
+.alert:first-child { border-top: 0; }
+.alert.err { --c: var(--red); } .alert.warn { --c: #c98a12; } .alert.info { --c: var(--ink-2); }
+.alert .link { padding: 0; min-height: 30px; white-space: nowrap; }
+.alert.watch b { min-width: 42px; }
+.small { font-size: 12.5px; }
+.quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.qa { display: flex; flex-direction: column; align-items: center; gap: 4px; border: 1px solid var(--rule); background: var(--sheet); border-radius: 10px; padding: 10px 4px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); box-shadow: var(--shadow); }
+.qa svg { width: 20px; height: 20px; color: var(--ink); }
+.heat { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; }
+.heat-tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 0; border-radius: 8px; padding: 8px 9px; background: color-mix(in srgb, var(--h) calc(var(--a) * 100%), var(--paper)); color: var(--ink); font-size: 12.5px; }
+.heat-tile b { font-size: 13px; }
+.heat-tile .up-dot { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); opacity: .6; }
+@media (min-width: 720px) {
+  .app { max-width: 1400px; }
+  .shell { flex: 1; display: grid; grid-template-columns: 96px minmax(0, 1fr); min-height: 0; }
+  .rail { position: sticky; top: 60px; align-self: start; height: calc(100vh - 60px); display: flex; flex-direction: column; gap: 4px; padding: 6px 8px 16px 10px; }
+  .rail-btn { border: 0; background: none; border-radius: 12px; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: var(--ink-2); font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .rail-btn svg { width: 22px; height: 22px; }
+  .rail-btn[aria-selected="true"] { background: var(--sheet); color: var(--ink); box-shadow: var(--shadow); border: 1px solid var(--rule); }
+  .panes.wide { display: flex; flex-direction: column; gap: 12px; padding: 0 16px 24px 4px; grid-template-columns: none; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+  .kpi .kv-big { font-size: 19px; }
+  .dash { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+  .dash .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .flow { column-count: 2; column-gap: 12px; }
+  .flow > * { break-inside: avoid; margin-bottom: 12px; }
+  .flow > .span-all { column-span: all; }
+  .rtabs { display: none !important; }
+}
+@media (min-width: 1150px) { .dash { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } }
 </style>
 </head>
 <body>
@@ -395,16 +434,13 @@ const GUIDE = [
 ];
 
 const E = new Function(ENGINE_SRC + '\n;return KabuEngine;')();
-const APP_VERSION = 'v4';
+const APP_VERSION = 'v5';
 const BRIDGE_VERSION = 3;                                // the bridge script this page ships with
 // shown once after an update ("Updated to v3"), and in Settings -> About
 const WHATS_NEW = [
-  'If checking for updates fails, Settings now says why and what to check, instead of one long line running off the screen.',
-  'A dashboard on Home: what the bot did today, what it will do at the next open, and a leaderboard of you vs every strategy vs the ASX 200.',
-  'Build your own strategies from rules (Strategies tab), with ready-made examples and a full guide.',
-  'Your own paper trading (Trade tab): place orders that fill at the next open, like the bot, and see who wins.',
-  'Typing in text boxes no longer closes the keyboard.',
-  'The version you are on is shown at the top, and after every update.',
+  'Unfolded screen: a navigation rail on the left and two-column layouts that use the whole width.',
+  'Home dashboard: key numbers at the top (you, the leading bot, the ASX 200, orders waiting, the bot), a Needs attention list, quick actions, stocks close to a signal, and a watchlist heat map.',
+  'Fixed: the Android app no longer offers the version you are already on ("update ready v4 → v4").',
 ];
 // Inside the Android app (kabu-android) the page talks to the app through window.KabuNative.
 const NATIVE = window.KabuNative || null;
@@ -826,6 +862,8 @@ function numField(label, value, onSave, opts = {}) {
 }
 const seg = (id, value, options, onpick) => h('div', { class: 'seg', role: 'group', id },
   options.map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(value === v), onclick: () => onpick(v) }, l)));
+
+const spanAll = el => { el.classList.add('span-all'); return el; };
 // ---------- Home: the dashboard ----------
 function viewHome() {
   if (!normUrl(S.br.url)) {
@@ -837,18 +875,108 @@ function viewHome() {
         h('li', { text: 'Start paper trading. Each evening the bot checks the rules, trades paper money and emails you. Place your own paper trades on the Trade tab.' })),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => go('settings') }, 'Set up the bridge'), h('button', { class: 'btn', type: 'button', onclick: () => openHelp() }, 'How it works')))];
   }
-  const out = [];
-  if (S.busy) out.push(h('section', { class: 'notice', id: 'busy' }, h('span', { class: 'muted', text: S.busy })));
-  out.push(updateBanner());
-  if (S.brVersion && S.brVersion < BRIDGE_VERSION) out.push(bridgeUpdateNote());
-  out.push(botCard());
+  const wide = innerWidth >= 720;
   const pr = S.cfg.paperStart ? results('paper') : null;
-  if (!S.cfg.paperStart) out.push(notStartedCard());
-  else if (!pr) out.push(startingCard());
-  else out.push(nextOpenCard(pr), leaderboardCard(pr), heldCard(pr));
-  out.push(activityCard(pr), marketCard());
-  out.push(h('p', { class: 'muted foot', text: `Kabu ${APP_VERSION} · paper money only · not financial advice` }));
-  return out.filter(Boolean);
+  const top = [S.busy ? h('section', { class: 'notice', id: 'busy' }, h('span', { class: 'muted', text: S.busy })) : null,
+    updateBanner(), S.brVersion && S.brVersion < BRIDGE_VERSION ? bridgeUpdateNote() : null, kpiStrip(pr), attentionCard(pr)];
+  const main = !S.cfg.paperStart ? [notStartedCard()] : !pr ? [startingCard()] : [nextOpenCard(pr), leaderboardCard(pr)];
+  const side = [botCard(), quickActions(), watchCard(pr)];
+  const rest = [pr ? heldCard(pr) : null, marketCard(), activityCard(pr)];
+  const foot = h('p', { class: 'muted foot', text: `Kabu ${APP_VERSION} · paper money only · not financial advice` });
+  if (wide) return [...top, h('div', { class: 'dash' },
+    h('div', { class: 'col', id: 'dash-main' }, main, pr ? heldCard(pr) : null, activityCard(pr)),
+    h('div', { class: 'col', id: 'dash-side' }, side, marketCard())), foot].flat().filter(Boolean);
+  return [...top, ...main, side[0], side[2], ...rest, side[1], foot].flat().filter(Boolean);
+}
+
+// ---- the numbers that matter, at a glance ----
+function tile(label, value, sub, cls, onclick, id) {
+  return h(onclick ? 'button' : 'div', { class: 'kpi', type: onclick ? 'button' : null, onclick, id },
+    h('span', { class: 'lbl', text: label }), h('span', { class: 'kv-big mono ' + (cls || ''), text: value }), sub ? h('span', { class: 'kpi-sub', text: sub }) : null);
+}
+function kpiStrip(pr) {
+  const tiles = [];
+  const st = S.status || {};
+  const botState = S.trigger === false ? 'Off' : st.error ? 'Problem' : st.at ? 'Running' : 'Not run yet';
+  if (pr) {
+    const keys = Object.keys(pr).sort((a, b) => pr[b].metrics.ret - pr[a].metrics.ret);
+    const me = pr.me, leader = keys.find(k => k !== 'bench' && k !== 'me');
+    if (me) {
+      const day = me.equity.length > 1 ? me.equity.at(-2).v * (me.equity.at(-1).x / me.equity.at(-2).x - 1) : 0;
+      tiles.push(tile('You', money(me.metrics.final), `${pct(me.metrics.ret)} · #${keys.indexOf('me') + 1} of ${keys.length} · day ${day >= 0 ? '+' : '−'}${money(Math.abs(day))}`, sgn(me.metrics.ret), () => go('trade'), 'kpi-me'));
+    }
+    if (leader) tiles.push(tile('Leading bot', pct(pr[leader].metrics.ret), nameOf(leader), sgn(pr[leader].metrics.ret), () => openStrategy(leader, 'paper'), 'kpi-leader'));
+    if (pr.bench) { const b = pr.bench.equity, d = b.length > 1 ? b.at(-1).x / b.at(-2).x - 1 : 0; tiles.push(tile('ASX 200', pct(pr.bench.metrics.ret), 'since start · day ' + pct(d), sgn(pr.bench.metrics.ret), null, 'kpi-bench')); }
+    const next = Object.keys(pr).filter(k => k !== 'bench').reduce((n, k) => n + pr[k].next.length, 0);
+    tiles.push(tile('Next open', String(next), next === 1 ? 'order waiting' : 'orders waiting', '', () => document.getElementById('next-card')?.scrollIntoView({ behavior: 'smooth' }), 'kpi-next'));
+  } else {
+    const bt = results('bt');
+    if (bt) {
+      const keys = Object.keys(bt).filter(k => k !== 'bench').sort((a, b) => bt[b].metrics.ret - bt[a].metrics.ret);
+      if (keys[0]) tiles.push(tile('Best ' + S.period.toUpperCase() + ' backtest', pct(bt[keys[0]].metrics.ret), nameOf(keys[0]), sgn(bt[keys[0]].metrics.ret), () => go('strategies'), 'kpi-best'));
+      if (bt.bench) tiles.push(tile('ASX 200 ' + S.period.toUpperCase(), pct(bt.bench.metrics.ret), 'buy and hold', sgn(bt.bench.metrics.ret), null, 'kpi-bench'));
+    }
+    const b = breadth();
+    if (b) tiles.push(tile('Above 200-day', `${b.above}/${b.n}`, 'watchlist in an uptrend', '', () => go('stocks'), 'kpi-breadth'));
+  }
+  tiles.push(tile('Bot', botState, S.trigger === false ? 'switched off' : 'next ' + nextRun(), botState === 'Running' ? 'up' : botState === 'Off' || botState === 'Problem' ? 'down' : '', () => document.getElementById('bot-card')?.scrollIntoView({ behavior: 'smooth' }), 'kpi-bot'));
+  return h('section', { class: 'kpis', id: 'kpis' }, tiles);
+}
+function breadth() {
+  const data = dataFor(), n = data.dates.length;
+  if (n < 2) return null;
+  const rows = S.cfg.tickers.filter(t => data.tickers[t]).map(t => { const a = E.series(data, t, 'sma:200')[n - 1]; return a ? data.tickers[t].cf[n - 1] > a : false; });
+  return { above: rows.filter(Boolean).length, n: rows.length };
+}
+
+// ---- things that need you ----
+function attentionCard(pr) {
+  const items = [], st = S.status || {}, last = lastDate();
+  if (S.trigger === false) items.push(['err', "The daily bot is switched off. In Apps Script pick setupKabu and press Run (once)."]);
+  if (st.error) items.push(['err', 'The last bot run failed: ' + brMsg({ message: st.error })]);
+  if (S.cfg.paperStart && st.day && last && st.day < last && !st.error) items.push(['warn', `The bot hasn't traded the ${shortDay(last)} close yet. It catches up at its next run, or tap Run now.`, ['Run now', runNow]]);
+  if (st.stale && st.stale.length) items.push(['warn', "Yahoo didn't refresh " + st.stale.map(x => x.split(' ')[0]).join(', ') + ' at the last run.']);
+  if (pr && pr.me) (pr.me.rejected || []).filter(r => r.d === last).forEach(r => items.push(['err', `Your ${r.side} of ${r.t} couldn't fill: ${r.why}.`, ['Trade', () => go('trade')]]));
+  const pend = S.orders.filter(o => canCancel(o));
+  if (pend.length) items.push(['info', pend.length === 1 ? 'Your order fills at the next open. You can still cancel it.' : `${pend.length} of your orders fill at the next open. You can still cancel them.`, ['Review', () => go('trade')]]);
+  if (!strategyKeys(true).length) items.push(['warn', 'Every strategy is switched off, so the bot has nothing to trade.', ['Strategies', () => go('strategies')]]);
+  if (!items.length) return null;
+  return cardId('attention', 'Needs attention', h('span', { class: 'lbl', text: String(items.length) }),
+    h('div', { class: 'alerts' }, items.map(([cls, text, act]) => h('div', { class: 'alert ' + cls }, h('span', { class: 'dot' }), h('span', { class: 'grow', text }), act ? h('button', { class: 'link', type: 'button', onclick: act[1] }, act[0]) : null))));
+}
+
+function quickActions() {
+  return h('section', { class: 'quick', id: 'quick' },
+    h('button', { class: 'qa', type: 'button', onclick: () => go('trade') }, icon('trade'), 'Trade'),
+    h('button', { class: 'qa', type: 'button', onclick: () => openBuilder(null) }, icon('plus'), 'New strategy'),
+    h('button', { class: 'qa', type: 'button', onclick: () => openTrades(S.cfg.paperStart ? 'paper' : 'bt') }, icon('log'), 'All trades'),
+    h('button', { class: 'qa', type: 'button', onclick: () => openGuide() }, icon('book'), 'Guide'));
+}
+
+// ---- stocks close to a built-in signal at the next close ----
+function watchCard(pr) {
+  const data = dataFor(), n = data.dates.length;
+  if (n < 210) return null;
+  const r = pr || results('bt'), pt = P('trend'), pd = P('dip'), rows = [];
+  S.cfg.tickers.filter(t => data.tickers[t]).forEach(t => {
+    const s = data.tickers[t], c = s.cf[n - 1];
+    const a = E.series(data, t, 'sma:' + pt.sma)[n - 1];
+    if (a && isOn('trend')) {
+      const held = r && r.trend && r.trend.positions[t];
+      const line = held ? a * (1 - pt.band) : a * (1 + pt.band), gap = c / line - 1;
+      if (Math.abs(gap) < 0.03 && (held ? gap > 0 : gap < 0)) rows.push({ t, k: 'trend', gap: Math.abs(gap), text: `${(Math.abs(gap) * 100).toFixed(1)}% ${held ? 'above' : 'below'} Trend filter's ${held ? 'sell' : 'buy'} line ($${line.toFixed(2)})` });
+    }
+    const tr = E.series(data, t, 'sma:' + pd.trend)[n - 1], hi = E.series(data, t, 'hi:' + pd.lookback)[n - 1];
+    if (tr && hi && isOn('dip') && c > tr) {
+      const drop = 1 - c / hi, need = pd.drop - drop;
+      if (need > 0 && need < 0.025) rows.push({ t, k: 'dip', gap: need, text: `down ${(drop * 100).toFixed(1)}% from its ${pd.lookback}-day high; Dip buying buys at ${Math.round(pd.drop * 100)}%` });
+    }
+  });
+  rows.sort((x, y) => x.gap - y.gap);
+  return cardId('watch', 'Close to a signal', h('span', { class: 'lbl', text: 'at the next close' }),
+    rows.length ? h('div', { class: 'alerts' }, rows.slice(0, 6).map(x => h('button', { class: 'alert watch', type: 'button', 'data-s': x.k, onclick: () => openStock(x.t, x.k) }, h('span', { class: 'dot' }), h('b', { class: 'mono', text: x.t }), h('span', { class: 'grow', text: x.text }))))
+      : h('p', { class: 'muted', text: 'No watchlist stock is within a few percent of a Trend filter or Dip buying trigger.' }),
+    h('p', { class: 'muted small', text: 'Built-in rules only. Your own strategies show their orders under Next open once they trigger.' }));
 }
 
 // ---- the bot: is it running, when did it run, when does it run next ----
@@ -1004,12 +1132,12 @@ function marketCard() {
   });
   const b = data.tickers[S.cfg.bench], bDay = b ? b.cf[n - 1] / b.cf[n - 2] - 1 : null, bA = b ? E.series(data, S.cfg.bench, 'sma:200')[n - 1] : null;
   const up = rows.slice().sort((x, y) => y.day - x.day), above = rows.filter(r => r.above).length;
-  const chipsFor = list => h('div', { class: 'chips' }, list.map(r => h('button', { class: 'chip', type: 'button', onclick: () => openStock(r.t) }, h('b', { class: 'mono', text: r.t }), h('span', { class: 'mono ' + sgn(r.day), text: pct(r.day) }))));
   return cardId('market', 'Market', h('span', { class: 'lbl', text: shortDay(data.dates[n - 1]) + ' close' }),
     h('dl', { class: 'kv' },
-      b ? [h('dt', { text: benchName() }), h('dd', { class: sgn(bDay), text: pct(bDay) + (bA ? ' · ' + (b.cf[n - 1] > bA ? 'above' : 'below') + ' its 200-day average' : '') })] : null,
-      h('dt', { text: 'Your watchlist' }), h('dd', { text: `${above} of ${rows.length} above their 200-day average` })),
-    rows.length ? [h('span', { class: 'lbl', text: 'Biggest moves' }), chipsFor(up.slice(0, 3).concat(up.slice(-3).reverse()).filter((r, i, a) => a.indexOf(r) === i))] : null);
+      b ? [h('dt', { text: benchName() }), h('dd', { class: sgn(bDay), text: pct(bDay) + (bA ? ' · ' + (b.cf[n - 1] > bA ? 'above' : 'below') + ' 200d avg' : '') })] : null,
+      h('dt', { text: 'Watchlist' }), h('dd', { text: `${above}/${rows.length} above 200d avg` })),
+    rows.length ? h('div', { class: 'heat', id: 'heat' }, up.map(r => { const a = Math.min(1, Math.abs(r.day) / 0.03); return h('button', { class: 'heat-tile', type: 'button', onclick: () => openStock(r.t), style: `--a:${(0.12 + a * 0.6).toFixed(2)};--h:${r.day >= 0 ? 'var(--up)' : 'var(--down)'}`, title: r.above ? 'above its 200-day average' : 'below its 200-day average' }, h('b', { class: 'mono', text: r.t }), h('span', { class: 'mono', text: pct(r.day) }), r.above ? h('i', { class: 'up-dot', 'aria-hidden': 'true' }) : null); })) : null,
+    rows.length ? h('p', { class: 'muted small', text: 'Colour = today\'s move. A dot means above its 200-day average. Tap a stock for its chart.' }) : null);
 }
 // ---------- Strategies: compare, switch on/off, build your own ----------
 const MAX_CUSTOM = 8;
@@ -1032,7 +1160,7 @@ function compareCard() {
   if (!r) return card('Compare', null, head, h('p', { class: 'muted', text: S.busy ? 'Loading prices…' : 'No prices yet. Tap refresh at the top.' }));
   const keys = Object.keys(r);
   const first = r[keys[0]];
-  return cardId('compare', 'Compare (backtest)', h('span', { class: 'lbl', text: `${shortDay(first.start)} – ${shortDay(first.end)}` }), head,
+  return spanAll(cardId('compare', 'Compare (backtest)', h('span', { class: 'lbl', text: `${shortDay(first.start)} – ${shortDay(first.end)}` }), head,
     chart(keys.map(k => ({ key: k, label: nameOf(k).split(' · ')[0], dash: k === 'bench', pts: r[k].equity.map(e => ({ d: e.d, v: e.x * S.cfg.capital })) })), { h: innerWidth >= 720 ? 280 : 220, label: `Growth of ${money(S.cfg.capital)} for each strategy and the benchmark`, fmt: v => money(v) }),
     legend(keys),
     h('div', { class: 'scroll-x' }, h('table', { class: 'tbl', id: 'cmp-table' },
@@ -1042,7 +1170,7 @@ function compareCard() {
         h('td', { class: sgn(m.ret), text: pct(m.ret, 0) }), h('td', { class: sgn(m.cagr), text: pct(m.cagr) }), h('td', { text: pct(-m.maxDD, 0) }), h('td', { class: 'mid-only', text: String(m.trades) }),
         h('td', { class: 'wide-only', text: m.winRate == null ? '—' : Math.round(m.winRate * 100) + '%' }), h('td', { class: 'wide-only', text: Math.round(m.exposure * 100) + '%' }), h('td', { class: 'wide-only', text: money(m.fees) }));
       })))),
-    h('p', { class: 'muted', text: `Starting with ${money(S.cfg.capital)}${S.cfg.topup ? ` plus ${money(S.cfg.topup)} a month` : ''} over ${first.metrics.years.toFixed(1)} years. Returns are time-weighted and include dividends (not franking credits) and costs: ${(S.cfg.costs.feePct * 100).toFixed(2)}% brokerage (min ${money(S.cfg.costs.feeMin)}) and ${(S.cfg.costs.slip * 100).toFixed(2)}% slippage per trade. Switched-off strategies are left out. Past results don't predict future returns.` }));
+    h('p', { class: 'muted', text: `Starting with ${money(S.cfg.capital)}${S.cfg.topup ? ` plus ${money(S.cfg.topup)} a month` : ''} over ${first.metrics.years.toFixed(1)} years. Returns are time-weighted and include dividends (not franking credits) and costs: ${(S.cfg.costs.feePct * 100).toFixed(2)}% brokerage (min ${money(S.cfg.costs.feeMin)}) and ${(S.cfg.costs.slip * 100).toFixed(2)}% slippage per trade. Switched-off strategies are left out. Past results don't predict future returns.` })));
 }
 
 function strategyListCard() {
@@ -1801,10 +1929,11 @@ function appCard() {
         h('label', { class: 'field' }, h('span', { class: 'lbl', text: 'Kabu website' }), site))));
 }
 addEventListener('kabu-native', e => {
-  const d = (e && e.detail) || {};
+  let d = (e && e.detail) || {};
   if (d.type !== 'update') return;
   const was = S.update && S.update.state;
   if (d.state === 'none' && was === 'ready') return;            // a download is still waiting: keep showing it
+  if (d.state === 'ready' && d.name === APP_VERSION) d = Object.assign({}, d, { state: 'none', latestName: d.name });
   S.update = d;
   if (d.state === 'ready' && was !== 'ready') toast(`Kabu ${d.name} is ready. You're on ${APP_VERSION}: restart to update.`);
   if (d.state === 'none' && d.manual) toast(d.latestName && d.latestName !== APP_VERSION ? `Your site has ${d.latestName}; you're on ${APP_VERSION}.` : `You're on ${APP_VERSION}, the latest ✓`);
@@ -1814,7 +1943,7 @@ addEventListener('kabu-native', e => {
 // Android back button: close a sheet, then go back to Home, then let the app close
 window.kabuBack = () => {
   if (S.sheet) { closeSheet(); return true; }
-  if (innerWidth < 720 && S.tab !== 'home') { go('home'); return true; }
+  if (S.tab !== 'home') { go('home'); return true; }
   return false;
 };
 
@@ -1835,7 +1964,6 @@ function updateErrorHelp(err, site) {
 const TABS = [['home', 'Home', 'home'], ['strategies', 'Strategies', 'strategies'], ['trade', 'Trade', 'trade'], ['stocks', 'Stocks', 'stocks'], ['settings', 'Settings', 'gear']];
 const VIEWS = { home: viewHome, strategies: viewStrategies, trade: viewTrade, stocks: viewStocks, settings: viewSettings };
 function go(tab) {
-  if (innerWidth >= 720 && tab !== 'home') { S.right = tab; ls.set('kabu.right', tab); }
   S.tab = tab;
   ls.set('kabu.tab', tab);
   draw(true);
@@ -1866,16 +1994,16 @@ function draw(force) {
     lastDate() ? h('span', { class: 'lbl hide-narrow', text: shortDay(lastDate()) }) : null,
     h('button', { class: 'ghost' + (S.busy ? ' spin' : ''), type: 'button', id: 'refresh', 'aria-label': 'Refresh prices', onclick: () => { loadBars(true); loadStatus(); } }, icon('refresh')),
     h('button', { class: 'ghost', type: 'button', 'aria-label': 'How it works', onclick: () => openHelp() }, icon('help')));
-  let panes;
-  if (wide) {
-    const r = S.right === 'home' || !VIEWS[S.right] ? 'strategies' : S.right;
-    panes = [h('div', { class: 'pane', id: 'pane-home' }, VIEWS.home()),
-      h('div', { class: 'pane', id: 'pane-right' }, h('nav', { class: 'rtabs', role: 'tablist' }, TABS.slice(1).map(([k, l]) => h('button', { type: 'button', role: 'tab', id: 'rtab-' + k, 'aria-selected': String(r === k), onclick: () => go(k) }, l))), VIEWS[r]())];
-  } else {
-    panes = [h('div', { class: 'pane', id: 'pane-main' }, VIEWS[S.tab] ? VIEWS[S.tab]() : VIEWS.home())];
-  }
+  const view = (VIEWS[S.tab] || VIEWS.home)();
+  // inner (unfolded) screen: a navigation rail on the left, the whole width for the screen you're on,
+  // laid out in two columns. Cover screen: one column with tabs at the bottom.
+  const body = wide
+    ? h('div', { class: 'shell' },
+        h('nav', { class: 'rail', role: 'tablist', 'aria-label': 'Sections' }, TABS.map(([k, l, ic]) => h('button', { class: 'rail-btn', type: 'button', role: 'tab', id: 'rtab-' + k, 'aria-selected': String(S.tab === k), onclick: () => go(k) }, icon(ic), h('span', { text: l })))),
+        h('main', { class: 'panes wide' }, S.tab === 'home' ? view : h('div', { class: 'flow', id: 'flow-' + S.tab }, view)))
+    : h('main', { class: 'panes' }, h('div', { class: 'pane', id: 'pane-main' }, view));
   const tabs = h('nav', { class: 'tabs', role: 'tablist', 'aria-label': 'Sections' }, TABS.map(([k, l, ic]) => h('button', { class: 'tab', type: 'button', role: 'tab', id: 'tab-' + k, 'aria-selected': String(S.tab === k), onclick: () => go(k) }, icon(ic), l)));
-  app.replaceChildren(top, h('main', { class: 'panes' }, panes), tabs);
+  app.replaceChildren(top, body, tabs);
   after.splice(0).forEach(f => f());
   if (keep) {
     const n = document.getElementById(keep.id);
@@ -1901,7 +2029,7 @@ async function boot() {
   if (seen && seen !== APP_VERSION) S.justUpdated = { from: seen, to: APP_VERSION };
   ls.set('kabu.seenVersion', APP_VERSION);
   draw();
-  if (NATIVE) { const u = native('updateState'); if (u) { try { S.update = JSON.parse(u); } catch (e) {} } native('ready', APP_VERSION); draw(); }
+  if (NATIVE) { const u = native('updateState'); if (u) { try { S.update = JSON.parse(u); if (S.update && S.update.state === 'ready' && S.update.name === APP_VERSION) S.update = null; } catch (e) {} } native('ready', APP_VERSION); draw(); }
   if (S.justUpdated) toast(`Updated to Kabu ${APP_VERSION} ✓`);
   if (normUrl(S.br.url)) { await loadStatus(); await loadBars(); }
   if (!NATIVE && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

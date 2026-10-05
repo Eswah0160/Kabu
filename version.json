@@ -1,11 +1,11 @@
 {
   "app": "kabu",
-  "version": 4,
-  "name": "v4",
+  "version": 5,
+  "name": "v5",
   "file": "index.html",
-  "bytes": 235488,
-  "sha256": "938764b3b07fee15cb0e9c70bdf226646cef0bc7fead2debba4f5a3450af95d2",
+  "bytes": 247494,
+  "sha256": "7b95aa046c4a3b1c64236c4fd19500571f5b2c5a10efa49a98e9ffcb3c6c0223",
   "bridge": 3,
   "minShell": 1,
-  "notes": "Settings explains a failed update check (and what to fix) instead of one long line running off the screen."
+  "notes": "Unfolded screen redesigned (side rail, two columns). Home dashboard: key numbers, needs attention, quick actions, close to a signal, heat map. Fixed \"update ready v4 → v4\"."
 }
