@@ -1,11 +1,11 @@
 {
   "app": "kabu",
-  "version": 3,
-  "name": "v3",
+  "version": 4,
+  "name": "v4",
   "file": "index.html",
-  "bytes": 234286,
-  "sha256": "2b901735b6bc865a4e1b80211b1791b1981038295d0f8d0b4a95e2b810748129",
+  "bytes": 235488,
+  "sha256": "938764b3b07fee15cb0e9c70bdf226646cef0bc7fead2debba4f5a3450af95d2",
   "bridge": 3,
   "minShell": 1,
-  "notes": "Dashboard on Home (bot status, next open, leaderboard of you vs every strategy vs the ASX 200, holdings, activity, market). Build your own strategies from rules, with presets and a guide. Your own paper trading on the Trade tab. Typing no longer closes the keyboard. The version is shown at the top and after every update."
+  "notes": "Settings explains a failed update check (and what to fix) instead of one long line running off the screen."
 }

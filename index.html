@@ -189,7 +189,7 @@ ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column;
 [data-s="me"] { --c: var(--ink); } .dot.bot { background: var(--ink-2); border-radius: 2px; }
 .ver { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--ink-2); border-bottom: 1px dotted var(--ink-2); }
 @media (max-width: 380px) { .hide-narrow { display: none; } }
-.status-chip { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 3px 9px; margin-left: auto; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap; }
+.status-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 3px 9px; margin-left: auto; border: 1px solid var(--rule); color: var(--ink-2); white-space: nowrap; }
 .status-chip::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
 .status-chip.ok { color: var(--up); border-color: color-mix(in srgb, var(--up) 45%, var(--rule)); }
 .status-chip.warn { color: #c98a12; border-color: color-mix(in srgb, #c98a12 45%, var(--rule)); }
@@ -395,10 +395,11 @@ const GUIDE = [
 ];
 
 const E = new Function(ENGINE_SRC + '\n;return KabuEngine;')();
-const APP_VERSION = 'v3';
+const APP_VERSION = 'v4';
 const BRIDGE_VERSION = 3;                                // the bridge script this page ships with
 // shown once after an update ("Updated to v3"), and in Settings -> About
 const WHATS_NEW = [
+  'If checking for updates fails, Settings now says why and what to check, instead of one long line running off the screen.',
   'A dashboard on Home: what the bot did today, what it will do at the next open, and a leaderboard of you vs every strategy vs the ASX 200.',
   'Build your own strategies from rules (Strategies tab), with ready-made examples and a full guide.',
   'Your own paper trading (Trade tab): place orders that fill at the next open, like the bot, and see who wins.',
@@ -1780,7 +1781,7 @@ function appCard() {
   const latest = u.state === 'ready' ? u.name : (u.latestName || i.latestName || '');
   const state = u.state === 'checking' ? ['Checking…', '']
     : u.state === 'ready' ? [`${u.name} is ready: restart to update`, 'warn']
-    : u.state === 'error' ? ["Couldn't check: " + (u.error || 'no connection'), 'err']
+    : u.state === 'error' ? ["Couldn't check", 'err']
     : latest && latest === APP_VERSION ? ['Up to date ✓', 'ok']
     : latest ? [`Your site has ${latest}`, ''] : ['Not checked yet', ''];
   const site = h('input', { id: 'site-url', type: 'url', value: i.site || '', autocomplete: 'off', placeholder: 'https://YOURNAME.github.io/kabu/' });
@@ -1791,6 +1792,7 @@ function appCard() {
       h('dt', { text: 'Your website has' }), h('dd', { id: 'ver-latest', text: latest || '—' }),
       h('dt', { text: 'App (APK)' }), h('dd', { text: i.shellName ? '1 · build ' + i.shellName : '—' }),
       h('dt', { text: 'Last checked' }), h('dd', { id: 'ver-checked', text: when })),
+    u.state === 'error' ? updateErrorHelp(u.error, i.site) : null,
     h('div', { class: 'row' },
       u.state === 'ready' ? h('button', { class: 'btn primary', type: 'button', id: 'apply-update-2', onclick: () => native('applyUpdate') }, `Restart to update to ${u.name}`)
         : h('button', { class: 'btn', type: 'button', id: 'check-update', disabled: u.state === 'checking', onclick: () => { S.update = { state: 'checking' }; draw(true); native('checkForUpdate'); } }, 'Check for updates')),
@@ -1815,6 +1817,20 @@ window.kabuBack = () => {
   if (innerWidth < 720 && S.tab !== 'home') { go('home'); return true; }
   return false;
 };
+
+/** Explain a failed update check in words, with what to try. */
+function updateErrorHelp(err, site) {
+  const e = String(err || 'no connection');
+  const url = (site || '') + 'version.json';
+  const tips = /\b404\b/.test(e)
+    ? ['Your website answered, but has no version.json at ' + url + '.',
+       'Check: the GitHub repo is called "kabu"; Settings → Pages is on (Deploy from a branch, main, / root); and version.json and index.html sit at the top of the repo, not inside a folder.',
+       'Open ' + url + ' in Chrome: it should show a few lines of text starting with {"app": "kabu".']
+    : /\b(403|5\d\d)\b/.test(e) ? ['GitHub answered with an error (' + e.replace(/.*answered (\d+).*/, '$1') + '). Try again in a few minutes.']
+    : /match/.test(e) ? [e]
+    : ["Couldn't reach " + (site || 'your website') + '. Check you are online.'];
+  return h('div', { class: 'stack', id: 'update-error' }, tips.map((t, k) => h('p', { class: k ? 'muted' : 'err', text: t })));
+}
 // ---------- layout ----------
 const TABS = [['home', 'Home', 'home'], ['strategies', 'Strategies', 'strategies'], ['trade', 'Trade', 'trade'], ['stocks', 'Stocks', 'stocks'], ['settings', 'Settings', 'gear']];
 const VIEWS = { home: viewHome, strategies: viewStrategies, trade: viewTrade, stocks: viewStocks, settings: viewSettings };

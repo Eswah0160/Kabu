@@ -1,6 +1,6 @@
 # Kabu strategy guide
 
-How to build, test and race strategies in Kabu (v3). The same guide is in the app: Strategies → Strategy guide.
+How to build, test and race strategies in Kabu (v4). The same guide is in the app: Strategies → Strategy guide.
 
 ## What a strategy is in Kabu
 
