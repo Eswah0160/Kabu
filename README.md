@@ -1,6 +1,6 @@
 # Kabu 株
 
-Kabu tests three simple trading rules on real ASX prices. You can see what they would have done over the last ten years, then run them forward with **paper money**. Nothing is bought or sold for real.
+Kabu tests trading rules on real ASX prices. You can see what they would have done over the last ten years, then run them forward with **paper money**, build your own rules, and trade alongside the bot yourself to see who wins. Nothing is bought or sold for real.
 
 | Strategy | The rule |
 |---|---|
@@ -8,7 +8,15 @@ Kabu tests three simple trading rules on real ASX prices. You can see what they 
 | **Monthly invest** | Always invested, with equal amounts in every stock. On the first trading day of each month, add any monthly top-up and rebalance. |
 | **Dip buying** | Buy a stock after it falls 7% from its 20-day high, but only while it's above its 200-day average. Sell when it bounces above its 10-day average, after 20 days, or at an 8% stop-loss. |
 
-Each strategy is compared with buying and holding an ASX 200 fund (IOZ). You can change the rules, the costs and the list of stocks in Settings.
+Each strategy is compared with buying and holding an ASX 200 fund (IOZ). You can switch strategies on and off, change their settings, and **build your own** from rules (golden cross, RSI pullbacks, breakouts, momentum rotation and more). How to do that is in **[STRATEGIES.md](STRATEGIES.md)**, the same guide that's in the app.
+
+## What's in the app
+
+- **Home** is a dashboard: whether the bot is running and when it runs next, what it did at the last open and will do at the next, a **leaderboard** of you vs every strategy vs the ASX 200, what is held right now, recent activity, and the market.
+- **Strategies** compares everything over 1–10 years, switches strategies on and off, and builds new ones with a live backtest as you type.
+- **Trade** is your own paper account: buy and sell any ASX stock. Your orders fill at the next open with the same costs as the bot, and you can cancel until then.
+- **Stocks** is the watchlist the strategies trade. **Settings** holds the bridge, money and costs, and app updates.
+- The version you're on is always at the top (e.g. **v3**). After an update, Home says **Updated to Kabu v3 ✓** and what's new.
 
 Kabu comes in two forms that share this website:
 
@@ -20,11 +28,11 @@ Kabu comes in two forms that share this website:
 Kabu needs its own repository. Don't put it inside Kura's.
 
 1. On GitHub, create a new repository called `kabu`. Make it **Public**, because Pages needs that on a free account. There are no secrets in these files.
-2. Click **uploading an existing file**. Drag in everything from this folder: `index.html`, `version.json`, `sw.js`, `manifest.webmanifest`, the four icons and this README. Then click **Commit changes**.
+2. Click **uploading an existing file**. Drag in everything from this folder: `index.html`, `version.json`, `sw.js`, `manifest.webmanifest`, the four icons, `STRATEGIES.md` and this README. Then click **Commit changes**.
 3. Go to **Settings → Pages**. Under Source choose **Deploy from a branch**, pick `main` and `/ (root)`, then **Save**.
 4. After a minute the site is live at `https://YOURNAME.github.io/kabu/`.
 
-If you already have a v1 `kabu` repository, upload these files over the old ones instead.
+If you already have a `kabu` repository, upload these files over the old ones instead (always `index.html` and `version.json` together).
 
 ## Connect the bridge
 
@@ -40,17 +48,19 @@ The bridge is a small Google Apps Script in your own Google account. It loads AS
    - Click **Deploy** and copy the URL that ends in `/exec`.
 5. In Kabu, paste the URL and tap **Save and test**. The first load of 10 years of prices takes about half a minute.
 
-**Already have a v1 bridge?** Keep it, and update it in place, so the URL and your paper trading stay the same:
+**Already have a bridge (v1 or v2)?** Keep it, and update it in place, so the URL and your paper trading stay the same. Kabu v3 needs bridge v3 for your own orders, strategies you build and the dashboard's activity log:
 
-1. In Kabu go to **Settings → Bridge**. Under **Already have a bridge?**, paste its key: it's on line 3 of the script in Apps Script (`var SECRET = '…'`). Paste the `/exec` URL too and tap **Save and test**.
-2. Home then shows **Bridge update: v1 → v2**. Tap **Copy bridge script**, paste it over all the old code in Apps Script, and save.
-3. Click **Deploy → Manage deployments**, tap the pencil, set Version to **New version**, then click **Deploy**.
+1. In Kabu go to **Settings → Bridge**. If this phone or app doesn't know your bridge yet, open **Already have a bridge?**, paste its key (line 3 of the script in Apps Script: `var SECRET = '…'`) and the `/exec` URL, and tap **Save and test**.
+2. Home then shows **Bridge update**. Tap **Copy bridge script**, paste it over all the old code in Apps Script, and save.
+3. Click **Deploy → Manage deployments**, tap the pencil, set Version to **New version**, then click **Deploy**. Tap refresh in Kabu: the box disappears once the bridge reports v3.
 
 ## Compare, then start paper trading
 
-1. **Compare** shows each strategy over 1, 3, 5 or 10 years, with returns, the worst fall, the number of trades and fees. The "10Y" view starts about 10 months after the first price, because the 200-day averages need that much history first.
-2. When you're ready, tap **Start paper trading**. From then on, the bot runs after each ASX close (about 5–6pm Sydney time, weekdays).
-3. It emails you whenever a paper trade was made or one is due at the next open.
+1. **Strategies → Compare** shows each strategy over 1, 3, 5 or 10 years, with returns, the worst fall, the number of trades and fees. The "10Y" view starts about 10 months after the first price, because the 200-day averages need that much history first.
+2. Build your own if you like: **Strategies → New strategy** (see [STRATEGIES.md](STRATEGIES.md)).
+3. When you're ready, tap **Start paper trading**. From then on, the bot runs after each ASX close (about 5–6pm Sydney time, weekdays) for every switched-on strategy, and your own account opens with the same money.
+4. Place your own paper trades on the **Trade** tab, and watch the **leaderboard** on Home.
+5. The bot emails you whenever a paper trade was made (by it or you) or one is due at the next open.
 
 ## Releasing a new version
 
@@ -62,7 +72,7 @@ A new version of Kabu is two files: `index.html` and `version.json`. Always uplo
 
 ## Good to know
 
-- **Orders fill at the next morning's open.** Each order also pays the brokerage and slippage you set in Settings. Only whole shares are traded. Dividends are paid in cash on the ex-date; franking credits are not counted.
+- **Orders fill at the next morning's open**, the bot's and yours. Each order also pays the brokerage and slippage you set in Settings. Only whole shares are traded. Dividends are paid in cash on the ex-date; franking credits are not counted. Your order's time comes from the bridge, so it can't be back-dated.
 - **Paper results are recalculated from the start date every time.** Changing the rules or the stock list changes the paper results too. Restarting begins again from today.
 - **Prices come from Yahoo Finance's unofficial chart API, through your bridge.** Yahoo limits how often it can be asked. If loading fails, wait a few minutes and tap refresh. If a stock couldn't be refreshed, Kabu says so and shows the last prices it has.
 - **Your settings live in the bridge** (a Kabu folder in your Google Drive), so a new phone or a reinstall only needs the bridge URL and key.

@@ -1,11 +1,11 @@
 {
   "app": "kabu",
-  "version": 2,
-  "name": "v2",
+  "version": 3,
+  "name": "v3",
   "file": "index.html",
-  "bytes": 115680,
-  "sha256": "b1de3d7d48a206fcf9083f1459e142c37be2e40899bbb9a20ba3f295be19315a",
-  "bridge": 2,
+  "bytes": 234286,
+  "sha256": "2b901735b6bc865a4e1b80211b1791b1981038295d0f8d0b4a95e2b810748129",
+  "bridge": 3,
   "minShell": 1,
-  "notes": "Fixes: the daily bot no longer runs at weekends; prices stay right after a share split or a long gap; Kabu says when prices couldn't be refreshed. New: works inside the Kabu Android app, which updates itself."
+  "notes": "Dashboard on Home (bot status, next open, leaderboard of you vs every strategy vs the ASX 200, holdings, activity, market). Build your own strategies from rules, with presets and a guide. Your own paper trading on the Trade tab. Typing no longer closes the keyboard. The version is shown at the top and after every update."
 }
