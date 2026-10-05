@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kabu</title>
+<meta name="description" content="Test simple trading rules on real ASX prices, then run them with paper money.">
+<meta name="theme-color" content="#111110">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+:root {
+  --paper: #E7E7E4; --sheet: #F6F6F3; --ink: #262625; --ink-2: #63635F; --rule: #D3D3CF; --soft: #EEEEEA;
+  --red: #BD3226; --up: #1d7a4f; --down: #BD3226;
+  --s-trend: #2a78d6; --s-monthly: #eb6834; --s-dip: #1baf7a; --s-bench: #8a8a85;
+  --shadow: 0 1px 0 rgba(0,0,0,.03), 0 10px 24px -18px rgba(0,0,0,.35);
+  --f-mono: "DM Mono", ui-monospace, Menlo, Consolas, monospace;
+  --f-body: "Zen Kaku Gothic New", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111110; --sheet: #1A1A19; --ink: #E7E7E3; --ink-2: #9A9A95; --rule: #2C2C2A; --soft: #232322;
+    --red: #FF6B5E; --up: #4cc38a; --down: #FF6B5E;
+    --s-trend: #3987e5; --s-monthly: #d95926; --s-dip: #199e70; --s-bench: #8d8d88;
+    --shadow: 0 1px 0 rgba(0,0,0,.3), 0 10px 24px -16px rgba(0,0,0,.9);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111110; --sheet: #1A1A19; --ink: #E7E7E3; --ink-2: #9A9A95; --rule: #2C2C2A; --soft: #232322;
+  --red: #FF6B5E; --up: #4cc38a; --down: #FF6B5E;
+  --s-trend: #3987e5; --s-monthly: #d95926; --s-dip: #199e70; --s-bench: #8d8d88;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; -webkit-tap-highlight-color: transparent; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+.lbl { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); font-size: 13.5px; margin: 0; }
+.err { color: var(--red); font-size: 14px; margin: 0; }
+.up { color: var(--up); } .down { color: var(--down); }
+[data-s="trend"] { --c: var(--s-trend); } [data-s="monthly"] { --c: var(--s-monthly); } [data-s="dip"] { --c: var(--s-dip); } [data-s="bench"] { --c: var(--s-bench); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--ink-2)); flex: none; }
+
+/* frame */
+.app { min-height: 100%; display: flex; flex-direction: column; max-width: 1240px; margin: 0 auto; }
+.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--paper); }
+.brand { font-family: var(--f-mono); font-weight: 500; letter-spacing: 0.3em; font-size: 15px; }
+.brand small { font-weight: 400; letter-spacing: 0.1em; color: var(--ink-2); margin-left: 4px; }
+.pill { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.12em; border: 1px solid var(--ink-2); border-radius: 999px; padding: 2px 8px; color: var(--ink-2); }
+.grow { flex: 1; }
+.ghost { border: 0; background: none; min-width: 40px; height: 40px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); padding: 0 8px; }
+.ghost:active { background: var(--soft); }
+.ghost svg { width: 19px; height: 19px; }
+.spin svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.panes { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 12px 84px; }
+.pane { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; background: var(--sheet); border-top: 1px solid var(--rule); padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px)); }
+.tab { flex: 1; border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; min-height: 52px; color: var(--ink-2); font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 8px; }
+.tab svg { width: 20px; height: 20px; }
+.tab[aria-selected="true"] { color: var(--ink); }
+.tab[aria-selected="true"] svg { stroke-width: 2.2; }
+.rtabs { display: none; }
+@media (min-width: 720px) {
+  .panes { grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.4fr); padding-bottom: 16px; }
+  .tabs { display: none; }
+  .rtabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rtabs button { border: 1px solid var(--rule); background: var(--sheet); border-radius: 8px; min-height: 38px; padding: 0 12px; font-family: var(--f-mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
+  .rtabs button[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
+}
+
+/* cards */
+.card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card h2 { margin: 0; font-family: var(--f-mono); font-weight: 500; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; }
+.card-head { display: flex; align-items: center; gap: 2px 8px; flex-wrap: wrap; }
+.card-head h2 { white-space: nowrap; }
+.card-head .lbl { margin-left: auto; }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stack { display: flex; flex-direction: column; gap: 6px; }
+.btn { border: 1px solid var(--rule); background: var(--sheet); border-radius: 8px; min-height: 42px; padding: 0 14px; font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+.btn.primary { background: var(--ink); color: var(--sheet); border-color: var(--ink); font-weight: 500; }
+.btn.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 50%, var(--rule)); }
+.btn:disabled { opacity: 0.5; }
+.link { border: 0; background: none; padding: 6px 0; min-height: 36px; font-family: var(--f-mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--red); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--rule); background: transparent; border-radius: 999px; min-height: 36px; padding: 0 12px; font-family: var(--f-mono); font-size: 11.5px; letter-spacing: 0.08em; display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
+.chip .dot { width: 8px; height: 8px; }
+
+/* home */
+.hero-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.notice { border: 1px dashed var(--ink-2); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.notice.warn { border-color: var(--red); }
+.orders { display: flex; flex-direction: column; }
+.order { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 4px 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--rule); }
+.order:first-child { border-top: 0; padding-top: 2px; }
+.order .side { font-family: var(--f-mono); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; }
+.order .side.sell { color: var(--red); }
+.order .what { font-family: var(--f-mono); font-size: 14px; }
+.order .why { grid-column: 2 / -1; color: var(--ink-2); font-size: 13px; }
+.strat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; border: 0; background: none; text-align: left; padding: 12px 0; border-top: 1px solid var(--rule); width: 100%; }
+.strat:first-of-type { border-top: 0; }
+.strat .nm { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.strat .val { font-family: var(--f-mono); font-size: 20px; font-variant-numeric: tabular-nums; text-align: right; }
+.strat .sub { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); }
+.strat .spark { grid-column: 1 / -1; height: 34px; width: 100%; }
+.big { font-family: var(--f-mono); font-size: 30px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+
+/* charts */
+.chart { position: relative; width: 100%; touch-action: pan-y; user-select: none; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart .grid line { stroke: var(--rule); stroke-width: 1; }
+.chart .axis text { font-family: var(--f-mono); font-size: 10.5px; fill: var(--ink-2); }
+.chart .ser { fill: none; stroke: var(--c); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .ser.bench { stroke-dasharray: 4 4; stroke-width: 1.6; }
+.chart .ser.thin { stroke-width: 1.4; }
+.chart .xh { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 3; }
+.chart .pt { fill: var(--c); stroke: var(--sheet); stroke-width: 2; }
+.chart .mk-b { fill: var(--up); } .chart .mk-s { fill: var(--down); }
+.tip { position: absolute; top: 0; pointer-events: none; background: var(--ink); color: var(--sheet); border-radius: 8px; padding: 6px 9px; font-family: var(--f-mono); font-size: 11.5px; line-height: 1.5; white-space: nowrap; transform: translateX(-50%); z-index: 2; }
+.tip .r { display: flex; align-items: center; gap: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .ln { width: 16px; height: 0; border-top: 2px solid var(--c); }
+.legend .ln.dash { border-top-style: dashed; }
+
+/* tables */
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th { font-family: var(--f-mono); font-weight: 400; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); text-align: right; padding: 6px 6px; white-space: nowrap; }
+.tbl td { padding: 9px 6px; border-top: 1px solid var(--rule); text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tbl th:first-child, .tbl td:first-child { text-align: left; padding-left: 0; }
+.tbl td:first-child { font-family: var(--f-body); }
+.tbl tr.click { cursor: pointer; }
+.tbl .nm { display: inline-flex; align-items: center; gap: 7px; }
+.scroll-x { overflow-x: auto; }
+.wide-only, .mid-only { display: none; }
+@media (min-width: 430px) { .mid-only { display: table-cell; } }
+@media (min-width: 560px) { .wide-only { display: table-cell; } }
+.log { display: flex; flex-direction: column; }
+.log-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 10px; padding: 9px 0; border-top: 1px solid var(--rule); align-items: baseline; }
+.log-row:first-child { border-top: 0; }
+.log-row .d { font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); }
+.log-row .t { font-family: var(--f-mono); font-size: 14px; }
+.log-row .v { font-family: var(--f-mono); font-size: 13px; text-align: right; }
+.log-row .why { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-2); }
+
+/* forms */
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field input, .field select { border: 1px solid var(--rule); background: var(--paper); border-radius: 8px; min-height: 42px; padding: 0 10px; width: 100%; font-family: var(--f-mono); font-size: 14px; }
+.field input:focus { outline: 2px solid var(--ink-2); outline-offset: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 42px; }
+.check input { width: 20px; height: 20px; accent-color: var(--ink); }
+details summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 40px; }
+details summary::-webkit-details-marker { display: none; }
+details summary::after { content: "▾"; margin-left: auto; color: var(--ink-2); }
+details[open] summary::after { content: "▴"; }
+ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.tickers { display: flex; flex-wrap: wrap; gap: 6px; }
+.tk { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--rule); border-radius: 999px; padding: 0 2px 0 12px; font-family: var(--f-mono); font-size: 13px; min-height: 36px; }
+.tk button { border: 0; background: none; min-width: 32px; min-height: 32px; color: var(--ink-2); border-radius: 999px; }
+
+/* sheet (modal) */
+.scrim { position: fixed; inset: 0; z-index: 20; background: rgba(20,20,18,.42); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--sheet); width: 100%; max-width: 720px; max-height: 92vh; border-radius: 14px 14px 0 0; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+.sheet-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--rule); }
+.sheet-head h2 { margin: 0; font-family: var(--f-mono); font-weight: 500; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; }
+.sheet-body { overflow: auto; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 14px; }
+@media (min-width: 720px) { .scrim { align-items: center; } .sheet { border-radius: 14px; } }
+.toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 30; background: var(--ink); color: var(--sheet); border-radius: 10px; padding: 10px 14px; font-size: 14px; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
+@media (min-width: 720px) { .toast { bottom: 24px; } }
+.foot { text-align: center; padding: 6px 0 2px; }
+.help h3 { margin: 6px 0 0; font-size: 15px; }
+.help p { margin: 0; font-size: 14.5px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
+.kv dt { color: var(--ink-2); } .kv dd { margin: 0; font-family: var(--f-mono); text-align: right; }
+</style>
+</head>
+<body>
+<div id="app" class="app"></div>
+<script>
+const ENGINE_SRC = "/* Kabu engine: the same code runs the backtests in the app and the paper bot in the Google bridge.\n   Daily bars. Signals are taken at the close; orders fill at the next trading day's open. */\nvar KabuEngine = (function () {\n  var STRATS = ['trend', 'monthly', 'dip'];\n  var NAMES = { trend: 'Trend filter', monthly: 'Monthly invest', dip: 'Dip buying', hold: 'Buy and hold' };\n  var DEFAULTS = {\n    trend: { sma: 200, band: 0.02 },                                // hold while the close is 2% above its 200-day average; sell 2% below\n    monthly: { drift: 0.05 },                                       // rebalance to equal weight on the first trading day of each month\n    dip: { drop: 0.07, lookback: 20, trend: 200, exitSma: 10, maxDays: 20, stop: 0.08 },\n    hold: {},\n  };\n  var COSTS = { feePct: 0.001, feeMin: 5, slip: 0.0005 };\n\n  var r2 = function (x) { return Math.round(x * 100) / 100; };\n  var num = function (x) { return typeof x === 'number' && isFinite(x) ? x : null; };\n\n  // ---- indicators (null until there is enough history) ----\n  function sma(xs, n) {\n    var out = new Array(xs.length), sum = 0, q = [];\n    for (var i = 0; i < xs.length; i++) {\n      var x = xs[i];\n      if (x != null) { q.push(x); sum += x; if (q.length > n) sum -= q.shift(); }\n      out[i] = q.length >= n ? sum / n : null;\n    }\n    return out;\n  }\n  function rollMax(xs, n) {\n    var out = new Array(xs.length), q = [];\n    for (var i = 0; i < xs.length; i++) {\n      if (xs[i] != null) { q.push(xs[i]); if (q.length > n) q.shift(); }\n      out[i] = q.length ? Math.max.apply(null, q) : null;\n    }\n    return out;\n  }\n\n  // ---- data: { T: { d:[dates], o:[], h:[], l:[], c:[], div:{date: amount} } } \u2192 aligned arrays ----\n  function align(bars, tickers) {\n    var set = {};\n    tickers.forEach(function (t) { var b = bars[t]; if (b && b.d) b.d.forEach(function (d) { set[d] = 1; }); });\n    var dates = Object.keys(set).sort();\n    var idx = {};\n    dates.forEach(function (d, i) { idx[d] = i; });\n    var out = {};\n    tickers.forEach(function (t) {\n      var b = bars[t];\n      if (!b || !b.d || !b.d.length) return;\n      var n = dates.length, o = new Array(n).fill(null), h = new Array(n).fill(null), c = new Array(n).fill(null), div = new Array(n).fill(0);\n      for (var k = 0; k < b.d.length; k++) {\n        var i = idx[b.d[k]];\n        c[i] = num(b.c[k]);\n        o[i] = num(b.o[k]) != null ? b.o[k] : c[i];\n        h[i] = num(b.h[k]) != null ? b.h[k] : c[i];\n      }\n      Object.keys(b.div || {}).forEach(function (d) {\n        // a dividend on a non-trading date counts on the next trading day\n        var i = idx[d];\n        if (i == null) { for (var j = 0; j < n; j++) if (dates[j] > d) { i = j; break; } }\n        if (i != null) div[i] += +b.div[d] || 0;\n      });\n      // forward-filled close for valuation and indicators\n      var cf = new Array(n), last = null;\n      for (var m = 0; m < n; m++) { if (c[m] != null) last = c[m]; cf[m] = last; }\n      out[t] = { o: o, h: h, c: c, cf: cf, div: div, first: c.findIndex(function (x) { return x != null; }) };\n    });\n    return { dates: dates, tickers: out };\n  }\n\n  var fee = function (value, cost) { return value > 0 ? Math.max(cost.feeMin, value * cost.feePct) : 0; };\n  var monthOf = function (d) { return d.slice(0, 7); };\n\n  // ---- the simulator ----\n  function simulate(data, cfg) {\n    var dates = data.dates;\n    var strat = cfg.strategy;\n    var p = Object.assign({}, DEFAULTS[strat] || {}, (cfg.params || {})[strat] || {});\n    var cost = Object.assign({}, COSTS, cfg.costs || {});\n    var tickers = (cfg.tickers || []).filter(function (t) { return data.tickers[t]; });\n    var N = tickers.length;\n    var capital = +cfg.capital || 10000, topup = +cfg.topup || 0;\n    var start = 0;\n    while (start < dates.length && dates[start] < cfg.start) start++;\n    var end = dates.length - 1;\n    if (cfg.end) while (end > 0 && dates[end] > cfg.end) end--;\n    var res = { strategy: strat, name: NAMES[strat], start: dates[start] || null, end: dates[end] || null, equity: [], trades: [], next: [], positions: {}, cash: capital, contributed: capital, metrics: null, tickers: tickers };\n    if (!N || start > end) { res.metrics = metrics(res, []); return res; }\n\n    // indicators per ticker\n    var ind = {};\n    tickers.forEach(function (t) {\n      var s = data.tickers[t];\n      ind[t] = {\n        sma: sma(s.cf, strat === 'dip' ? p.trend : (p.sma || 200)),\n        exit: strat === 'dip' ? sma(s.cf, p.exitSma) : null,\n        hi: strat === 'dip' ? rollMax(s.h.map(function (x, i) { return x != null ? x : s.cf[i]; }), p.lookback) : null,\n      };\n    });\n\n    var cash = capital, contributed = capital, pos = {}, pending = [], trades = [], eq = [], flows = [], fees = 0, divs = 0, exits = [];\n    var lastEq = capital, prevIdx = 1, peak = 1, maxDD = 0, invSum = 0;\n\n    function value(i) { var v = cash; for (var t in pos) v += pos[t].qty * (data.tickers[t].cf[i] || 0); return v; }\n\n    function fill(o, i) {\n      var s = data.tickers[o.t], open = s.o[i];\n      if (open == null) return false;                     // no trading in this stock today: try again tomorrow\n      if (o.side === 'sell') {\n        var ps = pos[o.t];\n        if (!ps) return true;\n        var q = Math.min(o.qty || ps.qty, ps.qty);\n        var px = open * (1 - cost.slip), val = q * px, f = fee(val, cost);\n        cash += val - f; fees += f;\n        var costPart = ps.cost * (q / ps.qty);\n        if (q >= ps.qty) { exits.push({ t: o.t, pnl: val - f - ps.cost, days: i - ps.at }); delete pos[o.t]; }\n        else { ps.qty -= q; ps.cost -= costPart; }\n        trades.push({ d: dates[i], t: o.t, side: 'sell', qty: q, px: r2(px), fee: r2(f), value: r2(val), why: o.why, strategy: strat });\n        return true;\n      }\n      var bpx = open * (1 + cost.slip);\n      var budget = Math.min(o.value, cash);\n      var qty = Math.floor(budget / (bpx * (1 + cost.feePct)));\n      while (qty > 0 && qty * bpx + fee(qty * bpx, cost) > cash) qty--;\n      if (qty <= 0) return true;                          // not enough cash: drop the order\n      var bval = qty * bpx, bf = fee(bval, cost);\n      cash -= bval + bf; fees += bf;\n      var cur = pos[o.t];\n      if (cur) { cur.qty += qty; cur.cost += bval + bf; }\n      else pos[o.t] = { qty: qty, cost: bval + bf, at: i, entry: bpx };\n      trades.push({ d: dates[i], t: o.t, side: 'buy', qty: qty, px: r2(bpx), fee: r2(bf), value: r2(bval), why: o.why, strategy: strat });\n      return true;\n    }\n\n    function signals(i) {\n      var orders = [], E = value(i), slot = E / N, d = dates[i];\n      var newMonth = i === start || monthOf(d) !== monthOf(dates[i - 1]);\n      tickers.forEach(function (t) {\n        var s = data.tickers[t], c = s.c[i], held = pos[t], m = ind[t];\n        if (c == null) return;\n        if (strat === 'trend') {\n          var a = m.sma[i];\n          if (a == null) return;\n          if (!held && c > a * (1 + p.band)) orders.push({ t: t, side: 'buy', value: slot, why: 'Closed above its ' + p.sma + '-day average (' + r2(a) + ')' });\n          else if (held && c < a * (1 - p.band)) orders.push({ t: t, side: 'sell', qty: held.qty, why: 'Closed below its ' + p.sma + '-day average (' + r2(a) + ')' });\n        } else if (strat === 'dip') {\n          var tr = m.sma[i], hi = m.hi[i], ex = m.exit[i];\n          if (!held) {\n            if (tr != null && hi != null && c > tr && c <= hi * (1 - p.drop)) orders.push({ t: t, side: 'buy', value: slot, why: 'Fell ' + Math.round((1 - c / hi) * 100) + '% from its ' + p.lookback + '-day high while above its ' + p.trend + '-day average' });\n          } else {\n            var why = c <= held.entry * (1 - p.stop) ? 'Stop-loss: ' + Math.round(p.stop * 100) + '% below the buy price'\n              : (ex != null && c > ex && i > held.at) ? 'Bounced back above its ' + p.exitSma + '-day average'\n              : i - held.at >= p.maxDays ? 'Held ' + p.maxDays + ' trading days' : null;\n            if (why) orders.push({ t: t, side: 'sell', qty: held.qty, why: why });\n          }\n        }\n      });\n      if ((strat === 'monthly' || strat === 'hold') && newMonth) {\n        if (strat === 'hold') {\n          var t0 = tickers[0], c0 = data.tickers[t0].c[i];\n          if (c0 != null && cash > cost.feeMin * 20) orders.push({ t: t0, side: 'buy', value: cash, why: i === start ? 'Buy and hold' : 'Monthly top-up' });\n        } else {\n          tickers.forEach(function (t) {\n            var c = data.tickers[t].c[i];\n            if (c == null) return;\n            var have = pos[t] ? pos[t].qty * c : 0, diff = slot - have;\n            if (Math.abs(diff) < Math.max(slot * p.drift, cost.feeMin * 20)) return;\n            if (diff < 0) orders.push({ t: t, side: 'sell', qty: Math.floor(-diff / c), why: 'Monthly rebalance to equal weight' });\n            else orders.push({ t: t, side: 'buy', value: diff, why: have ? 'Monthly rebalance to equal weight' : (i === start ? 'Monthly invest: first buy' : 'Monthly invest') });\n          });\n        }\n      }\n      return orders.filter(function (o) { return o.side === 'buy' || o.qty > 0; });\n    }\n\n    for (var i = start; i <= end; i++) {\n      var d = dates[i], flow = 0;\n      if (i > start && topup > 0 && monthOf(d) !== monthOf(dates[i - 1])) { cash += topup; contributed += topup; flow = topup; }\n      for (var t in pos) { var dv = data.tickers[t].div[i]; if (dv) { cash += pos[t].qty * dv; divs += pos[t].qty * dv; } }\n      if (pending.length) {\n        var sells = pending.filter(function (o) { return o.side === 'sell'; }), buys = pending.filter(function (o) { return o.side === 'buy'; });\n        pending = sells.concat(buys).filter(function (o) { return !fill(o, i); });\n      }\n      var E = value(i);\n      var inv = E - cash;\n      invSum += E > 0 ? inv / E : 0;\n      var idx = i === start ? 1 : prevIdx * ((E - flow) / lastEq);\n      if (!isFinite(idx)) idx = prevIdx;\n      peak = Math.max(peak, idx); maxDD = Math.max(maxDD, 1 - idx / peak);\n      prevIdx = idx; lastEq = E;\n      eq.push({ d: d, v: r2(E), x: idx });\n      flows.push(flow);\n      var orders = signals(i);\n      // a new signal replaces an older unfilled one for the same stock\n      orders.forEach(function (o) { pending = pending.filter(function (q) { return q.t !== o.t; }); });\n      pending = pending.concat(orders);\n    }\n\n    res.equity = eq;\n    res.trades = trades;\n    res.next = pending.map(function (o) { return { t: o.t, side: o.side, qty: o.qty || null, value: o.value ? r2(o.value) : null, why: o.why, strategy: strat }; });\n    res.cash = r2(cash);\n    res.contributed = r2(contributed);\n    res.fees = r2(fees);\n    res.dividends = r2(divs);\n    var lastI = end;\n    Object.keys(pos).forEach(function (t) {\n      var ps = pos[t], c = data.tickers[t].cf[lastI];\n      res.positions[t] = { qty: ps.qty, cost: r2(ps.cost), value: r2(ps.qty * c), price: c, since: dates[ps.at], pnl: r2(ps.qty * c - ps.cost) };\n    });\n    res.metrics = metrics(res, exits, invSum / Math.max(1, eq.length), maxDD);\n    return res;\n  }\n\n  function metrics(res, exits, exposure, maxDD) {\n    var eq = res.equity;\n    if (!eq.length) return { final: res.cash, profit: 0, ret: 0, cagr: null, maxDD: 0, trades: 0, winRate: null, exposure: 0, fees: 0 };\n    var a = eq[0], z = eq[eq.length - 1];\n    var years = (Date.parse(z.d) - Date.parse(a.d)) / (365.25 * 864e5);\n    var wins = exits.filter(function (e) { return e.pnl > 0; }).length;\n    return {\n      final: z.v, profit: r2(z.v - res.contributed), ret: z.x - 1,\n      cagr: years >= 0.25 ? Math.pow(z.x, 1 / years) - 1 : null,\n      maxDD: maxDD || 0, trades: res.trades.length, roundTrips: exits.length,\n      winRate: exits.length ? wins / exits.length : null,\n      avgDays: exits.length ? exits.reduce(function (s, e) { return s + e.days; }, 0) / exits.length : null,\n      exposure: exposure || 0, fees: res.fees || 0, dividends: res.dividends || 0, years: years,\n    };\n  }\n\n  // run every strategy plus the benchmark over the same window\n  function compare(bars, cfg) {\n    var data = align(bars, cfg.tickers.concat(cfg.bench ? [cfg.bench] : []));\n    var out = {};\n    STRATS.forEach(function (s) { out[s] = simulate(data, Object.assign({}, cfg, { strategy: s })); });\n    if (cfg.bench && data.tickers[cfg.bench]) out.bench = simulate(data, Object.assign({}, cfg, { strategy: 'hold', tickers: [cfg.bench] }));\n    return { data: data, results: out };\n  }\n\n  return { STRATS: STRATS, NAMES: NAMES, DEFAULTS: DEFAULTS, COSTS: COSTS, sma: sma, rollMax: rollMax, align: align, simulate: simulate, compare: compare };\n})();\n";
+const BRIDGE_SRC = "/* Kabu bridge v2: ASX prices for the Kabu app, and the paper-trading bot that runs after each close.\n   Setup steps are in Kabu: Settings > Bridge. Paper money only: this script never places real orders. */\nvar SECRET = '__SECRET__';\nvar VERSION = 2;\nvar TZ = 'Australia/Sydney';\nvar DEFAULT_CONFIG = {\n  tickers: ['BHP', 'CBA', 'CSL', 'NAB', 'WBC', 'ANZ', 'WES', 'MQG', 'RIO', 'WOW', 'TLS', 'FMG'],\n  bench: 'IOZ', capital: 10000, topup: 0,\n  costs: { feePct: 0.001, feeMin: 5, slip: 0.0005 },\n  params: {}, paperStart: null, email: true, appUrl: '',\n};\n\n// ---- web app ----\nfunction doPost(e) {\n  return respond_(e && e.postData ? e.postData.contents : '');\n}\nfunction doGet(e) {\n  // Kabu falls back to GET (?p=...) when Google turns its POST into a page visit.\n  if (e && e.parameter && e.parameter.p) return respond_(e.parameter.p);\n  return ContentService.createTextOutput('Kabu bridge v' + VERSION + ' is running.');\n}\nfunction respond_(raw) {\n  var out;\n  try {\n    var req = JSON.parse(raw);\n    if (req.secret !== SECRET) throw new Error('bad_secret');\n    out = req.op === 'hello' || req.op === 'status' ? handle_(req) : withLock_(function () { return handle_(req); });\n  } catch (err) {\n    out = { ok: false, version: VERSION, error: String((err && err.message) || err) };\n  }\n  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);\n}\nfunction handle_(req) {\n  var base = { ok: true, version: VERSION };\n  if (req.op === 'hello') return merge_(base, { app: 'kabu', now: now_(), trigger: hasTrigger_() });\n  if (req.op === 'config') {\n    if (req.set) writeJson_('kabu-config.json', clean_(merge_(config_(), req.set)));\n    return merge_(base, { config: config_() });\n  }\n  if (req.op === 'bars') return merge_(base, { bars: bars_(req.tickers || [], !!req.refresh), now: now_() });\n  if (req.op === 'status') return merge_(base, { status: (readJson_('kabu-state.json') || {}).lastRun || null, config: config_(), trigger: hasTrigger_() });\n  if (req.op === 'run') return merge_(base, { status: daily_(true) });\n  throw new Error('unknown_op');\n}\n\n// Run once from the editor (pick setupKabu, press Run): Google asks for permission, and the daily bot is switched on.\nfunction setupKabu() {\n  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'kabuDaily') ScriptApp.deleteTrigger(t); });\n  ScriptApp.newTrigger('kabuDaily').timeBased().everyDays(1).atHour(17).inTimezone(TZ).create();\n  folder_();\n  var b = yahoo_('BHP', '5d');\n  Logger.log('Kabu is ready. Latest BHP close: ' + b.c[b.c.length - 1] + ' on ' + b.d[b.d.length - 1] + '. Emails go to ' + me_() + ' (' + MailApp.getRemainingDailyQuota() + ' left today).');\n}\n\n// ---- the daily paper bot (runs after the close, weekdays) ----\n// The time trigger calls this with an event object; the app's Run now calls it with true (already holding the lock).\nfunction kabuDaily(e) {\n  var manual = e === true;\n  if (!manual && +Utilities.formatDate(new Date(), TZ, 'u') >= 6) return null;   // Sat/Sun\n  return manual ? daily_(true) : withLock_(function () { return daily_(false); });\n}\nfunction daily_(manual) {\n  var cfg = config_();\n  var status = { at: now_(), manual: manual };\n  var state = readJson_('kabu-state.json') || {};\n  try {\n    var all = cfg.tickers.concat(cfg.bench ? [cfg.bench] : []);\n    var bars = bars_(all, true);\n    if (!cfg.paperStart) {\n      status.note = 'Paper trading has not started yet.';\n    } else {\n      var data = KabuEngine.align(bars, all);\n      var day = data.dates[data.dates.length - 1];\n      var base = { tickers: cfg.tickers, start: cfg.paperStart, capital: cfg.capital, topup: cfg.topup, costs: cfg.costs, params: cfg.params };\n      var res = {};\n      KabuEngine.STRATS.forEach(function (s) { res[s] = KabuEngine.simulate(data, merge_(base, { strategy: s })); });\n      if (cfg.bench && data.tickers[cfg.bench]) res.bench = KabuEngine.simulate(data, merge_(base, { strategy: 'hold', tickers: [cfg.bench] }));\n      status.day = day;\n      status.values = {};\n      status.today = [];\n      status.next = [];\n      Object.keys(res).forEach(function (k) {\n        status.values[k] = { final: res[k].metrics.final, ret: res[k].metrics.ret };\n        if (k === 'bench') return;\n        res[k].trades.forEach(function (t) { if (t.d === day) status.today.push(t); });\n        res[k].next.forEach(function (o) { status.next.push(o); });\n      });\n      var fresh = state.lastDay !== day;\n      if (cfg.email && fresh && (status.today.length || status.next.length)) {\n        MailApp.sendEmail(me_(), subject_(status), email_(status, cfg));\n        status.emailed = true;\n      }\n      state.lastDay = day;\n    }\n  } catch (err) {\n    status.error = String((err && err.message) || err);\n  }\n  state.lastRun = status;\n  writeJson_('kabu-state.json', state);\n  return status;\n}\nfunction subject_(s) {\n  var n = s.today.length;\n  return 'Kabu paper: ' + (n ? n + ' trade' + (n === 1 ? '' : 's') + ' today' : 'no trades today') + (s.next.length ? ', ' + s.next.length + ' for tomorrow' : '');\n}\nfunction money_(x) { return '$' + String(Math.round(+x || 0)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ','); }\nfunction email_(s, cfg) {\n  var N = KabuEngine.NAMES, L = ['Kabu paper trading, ' + s.day, ''];\n  if (s.today.length) {\n    L.push('Filled at today\\'s open (paper money):');\n    s.today.forEach(function (t) { L.push('- ' + N[t.strategy] + ': ' + (t.side === 'buy' ? 'bought ' : 'sold ') + t.qty + ' ' + t.t + ' at $' + t.px + ' (' + t.why + ')'); });\n    L.push('');\n  }\n  if (s.next.length) {\n    L.push('For tomorrow\\'s open:');\n    s.next.forEach(function (o) { L.push('- ' + N[o.strategy] + ': ' + (o.side === 'buy' ? 'buy about ' + money_(o.value) + ' of ' : 'sell ' + (o.qty ? o.qty + ' ' : '') ) + o.t + ' (' + o.why + ')'); });\n    L.push('');\n  }\n  L.push('Paper values since ' + cfg.paperStart + ':');\n  Object.keys(s.values).forEach(function (k) {\n    var v = s.values[k];\n    L.push('- ' + (k === 'bench' ? 'ASX 200 (' + cfg.bench + ')' : N[k]) + ': ' + money_(v.final) + ' (' + (v.ret >= 0 ? '+' : '') + (v.ret * 100).toFixed(1) + '%)');\n  });\n  L.push('', 'Paper money only, nothing was bought or sold for real.' + (cfg.appUrl ? ' Open Kabu: ' + cfg.appUrl : ''));\n  return L.join('\\n');\n}\n\n// ---- prices (Yahoo Finance daily bars, cached in Drive) ----\nfunction bars_(tickers, refresh) {\n  var cache = readJson_('kabu-bars.json') || {};\n  var changed = false, out = {}, errs = [], outdated = [];\n  tickers.forEach(function (t, i) {\n    t = String(t).toUpperCase().replace(/[^A-Z0-9.]/g, '');\n    if (!t) return;\n    var c = cache[t];\n    var stale = !c || refresh || Date.now() - (c.at || 0) > 6 * 3600 * 1000;\n    if (stale) {\n      try {\n        if (i) Utilities.sleep(250);\n        var inc = !!(c && c.d && c.d.length);\n        var fresh = yahoo_(t, inc ? '3mo' : '10y');\n        // a split (or any revision of old prices) changes the whole history, and a gap can't be patched: reload all of it\n        if (inc && needsFull_(c, fresh)) { Utilities.sleep(250); fresh = yahoo_(t, '10y'); inc = false; }\n        delete fresh.splits;\n        cache[t] = inc ? mergeBars_(c, fresh) : fresh;\n        cache[t].at = Date.now();\n        changed = true;\n      } catch (err) {\n        if (!c) { errs.push(t + ': ' + String(err.message || err)); return; }\n        outdated.push(t + ' ' + c.d[c.d.length - 1]);                  // serve the cached prices, but say they are old\n      }\n    }\n    out[t] = cache[t];\n  });\n  if (changed) writeJson_('kabu-bars.json', cache);\n  if (errs.length && !Object.keys(out).length) throw new Error('prices_failed: ' + errs.join('; '));\n  if (errs.length) out._errors = errs;\n  if (outdated.length) out._stale = outdated;\n  return out;\n}\nfunction needsFull_(old, add) {\n  if (add.splits && add.splits.length) return true;\n  if (!add.d.length || add.d[0] > old.d[old.d.length - 1]) return true;      // cache older than the refresh window\n  var at = {};\n  old.d.forEach(function (d, i) { at[d] = old.c[i]; });\n  for (var i = 0; i < add.d.length; i++) {\n    var o = at[add.d[i]];\n    if (o != null && add.c[i] != null && Math.abs(add.c[i] / o - 1) > 0.02) return true;\n  }\n  return false;\n}\nfunction mergeBars_(old, add) {\n  var m = {};\n  old.d.forEach(function (d, i) { m[d] = [old.o[i], old.h[i], old.l[i], old.c[i]]; });\n  add.d.forEach(function (d, i) { m[d] = [add.o[i], add.h[i], add.l[i], add.c[i]]; });\n  var days = Object.keys(m).sort(), out = { d: days, o: [], h: [], l: [], c: [], div: merge_(old.div || {}, add.div || {}) };\n  days.forEach(function (d) { out.o.push(m[d][0]); out.h.push(m[d][1]); out.l.push(m[d][2]); out.c.push(m[d][3]); });\n  return out;\n}\nfunction yahoo_(t, range) {\n  var sym = t.indexOf('.') > 0 ? t : t + '.AX';\n  var host = 'query1';\n  for (var tries = 0; tries < 3; tries++) {\n    var url = 'https://' + host + '.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(sym) + '?range=' + range + '&interval=1d&events=div%2Csplit';\n    var r = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36', Accept: 'application/json' } });\n    var code = r.getResponseCode();\n    if (code === 200) return parseYahoo_(JSON.parse(r.getContentText()), t);\n    if (code === 404) throw new Error('unknown_ticker ' + t);\n    if (code === 429 || code >= 500) { Utilities.sleep(1500 * (tries + 1)); host = host === 'query1' ? 'query2' : 'query1'; continue; }\n    throw new Error('yahoo_' + code);\n  }\n  throw new Error('yahoo_busy');\n}\nfunction parseYahoo_(j, t) {\n  var res = j && j.chart && j.chart.result && j.chart.result[0];\n  if (!res || !res.timestamp) throw new Error('no_data ' + t);\n  var zone = (res.meta && res.meta.exchangeTimezoneName) || TZ;\n  var q = res.indicators.quote[0];\n  var nowD = new Date(), today = Utilities.formatDate(nowD, TZ, 'yyyy-MM-dd'), hm = Utilities.formatDate(nowD, TZ, 'HHmm');\n  var day = function (ts) { return Utilities.formatDate(new Date(ts * 1000), zone, 'yyyy-MM-dd'); };\n  var r4 = function (x) { return x == null ? null : Math.round(x * 10000) / 10000; };\n  var out = { d: [], o: [], h: [], l: [], c: [], div: {} }, at = {};\n  res.timestamp.forEach(function (ts, i) {\n    if (q.close[i] == null) return;\n    var d = day(ts);\n    if (d === today && hm < '1620') return;           // today's bar isn't final until after the close\n    var row = [r4(q.open[i]), r4(q.high[i]), r4(q.low[i]), r4(q.close[i])];\n    if (at[d] != null) { var k = at[d]; out.o[k] = row[0]; out.h[k] = row[1]; out.l[k] = row[2]; out.c[k] = row[3]; return; }\n    at[d] = out.d.length;\n    out.d.push(d); out.o.push(row[0]); out.h.push(row[1]); out.l.push(row[2]); out.c.push(row[3]);\n  });\n  var dv = (res.events && res.events.dividends) || {};\n  Object.keys(dv).forEach(function (k) { var x = dv[k], d = day(x.date); out.div[d] = r4((out.div[d] || 0) + x.amount); });\n  var sp = (res.events && res.events.splits) || {};\n  out.splits = Object.keys(sp).map(function (k) { return day(sp[k].date); });\n  if (!out.d.length) throw new Error('no_data ' + t);\n  return out;\n}\n\n// ---- storage: a \"Kabu\" folder in your Google Drive ----\nfunction folder_() {\n  var props = PropertiesService.getScriptProperties();\n  var id = props.getProperty('kabuFolder');\n  if (id) { try { var f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (err) {} }\n  var it = DriveApp.getRootFolder().getFoldersByName('Kabu');\n  var folder = it.hasNext() ? it.next() : DriveApp.createFolder('Kabu');\n  props.setProperty('kabuFolder', folder.getId());\n  return folder;\n}\nfunction readJson_(name) {\n  var it = folder_().getFilesByName(name);\n  if (!it.hasNext()) return null;\n  try { return JSON.parse(it.next().getBlob().getDataAsString()); } catch (err) { return null; }\n}\nfunction writeJson_(name, obj) {\n  var f = folder_(), it = f.getFilesByName(name), json = JSON.stringify(obj);\n  if (it.hasNext()) it.next().setContent(json); else f.createFile(name, json, 'application/json');\n}\nfunction config_() { return clean_(merge_(DEFAULT_CONFIG, readJson_('kabu-config.json') || {})); }\nfunction clean_(c) {\n  var tick = function (x) { return String(x || '').toUpperCase().replace(/[^A-Z0-9.]/g, '').slice(0, 12); };\n  c.tickers = (Array.isArray(c.tickers) ? c.tickers : DEFAULT_CONFIG.tickers).map(tick).filter(Boolean).filter(function (t, i, a) { return a.indexOf(t) === i; }).slice(0, 30);\n  c.bench = tick(c.bench) || 'IOZ';\n  c.capital = Math.max(100, +c.capital || 10000);\n  c.topup = Math.max(0, +c.topup || 0);\n  c.costs = merge_(DEFAULT_CONFIG.costs, c.costs || {});\n  c.paperStart = /^\\d{4}-\\d\\d-\\d\\d$/.test(c.paperStart || '') ? c.paperStart : null;\n  c.email = c.email !== false;\n  return c;\n}\nfunction merge_(a, b) { var o = {}; Object.keys(a || {}).forEach(function (k) { o[k] = a[k]; }); Object.keys(b || {}).forEach(function (k) { o[k] = b[k]; }); return o; }\nfunction withLock_(fn) {\n  var lock = LockService.getScriptLock();\n  if (!lock.tryLock(120000)) throw new Error('busy');\n  try { return fn(); } finally { lock.releaseLock(); }\n}\nfunction now_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm'); }\nfunction me_() { return Session.getEffectiveUser().getEmail(); }\nfunction hasTrigger_() { return ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'kabuDaily'; }); }\n\n// ---- the strategy engine (the same code the app uses for backtests) ----\n\n/* Kabu engine: the same code runs the backtests in the app and the paper bot in the Google bridge.\n   Daily bars. Signals are taken at the close; orders fill at the next trading day's open. */\nvar KabuEngine = (function () {\n  var STRATS = ['trend', 'monthly', 'dip'];\n  var NAMES = { trend: 'Trend filter', monthly: 'Monthly invest', dip: 'Dip buying', hold: 'Buy and hold' };\n  var DEFAULTS = {\n    trend: { sma: 200, band: 0.02 },                                // hold while the close is 2% above its 200-day average; sell 2% below\n    monthly: { drift: 0.05 },                                       // rebalance to equal weight on the first trading day of each month\n    dip: { drop: 0.07, lookback: 20, trend: 200, exitSma: 10, maxDays: 20, stop: 0.08 },\n    hold: {},\n  };\n  var COSTS = { feePct: 0.001, feeMin: 5, slip: 0.0005 };\n\n  var r2 = function (x) { return Math.round(x * 100) / 100; };\n  var num = function (x) { return typeof x === 'number' && isFinite(x) ? x : null; };\n\n  // ---- indicators (null until there is enough history) ----\n  function sma(xs, n) {\n    var out = new Array(xs.length), sum = 0, q = [];\n    for (var i = 0; i < xs.length; i++) {\n      var x = xs[i];\n      if (x != null) { q.push(x); sum += x; if (q.length > n) sum -= q.shift(); }\n      out[i] = q.length >= n ? sum / n : null;\n    }\n    return out;\n  }\n  function rollMax(xs, n) {\n    var out = new Array(xs.length), q = [];\n    for (var i = 0; i < xs.length; i++) {\n      if (xs[i] != null) { q.push(xs[i]); if (q.length > n) q.shift(); }\n      out[i] = q.length ? Math.max.apply(null, q) : null;\n    }\n    return out;\n  }\n\n  // ---- data: { T: { d:[dates], o:[], h:[], l:[], c:[], div:{date: amount} } } \u2192 aligned arrays ----\n  function align(bars, tickers) {\n    var set = {};\n    tickers.forEach(function (t) { var b = bars[t]; if (b && b.d) b.d.forEach(function (d) { set[d] = 1; }); });\n    var dates = Object.keys(set).sort();\n    var idx = {};\n    dates.forEach(function (d, i) { idx[d] = i; });\n    var out = {};\n    tickers.forEach(function (t) {\n      var b = bars[t];\n      if (!b || !b.d || !b.d.length) return;\n      var n = dates.length, o = new Array(n).fill(null), h = new Array(n).fill(null), c = new Array(n).fill(null), div = new Array(n).fill(0);\n      for (var k = 0; k < b.d.length; k++) {\n        var i = idx[b.d[k]];\n        c[i] = num(b.c[k]);\n        o[i] = num(b.o[k]) != null ? b.o[k] : c[i];\n        h[i] = num(b.h[k]) != null ? b.h[k] : c[i];\n      }\n      Object.keys(b.div || {}).forEach(function (d) {\n        // a dividend on a non-trading date counts on the next trading day\n        var i = idx[d];\n        if (i == null) { for (var j = 0; j < n; j++) if (dates[j] > d) { i = j; break; } }\n        if (i != null) div[i] += +b.div[d] || 0;\n      });\n      // forward-filled close for valuation and indicators\n      var cf = new Array(n), last = null;\n      for (var m = 0; m < n; m++) { if (c[m] != null) last = c[m]; cf[m] = last; }\n      out[t] = { o: o, h: h, c: c, cf: cf, div: div, first: c.findIndex(function (x) { return x != null; }) };\n    });\n    return { dates: dates, tickers: out };\n  }\n\n  var fee = function (value, cost) { return value > 0 ? Math.max(cost.feeMin, value * cost.feePct) : 0; };\n  var monthOf = function (d) { return d.slice(0, 7); };\n\n  // ---- the simulator ----\n  function simulate(data, cfg) {\n    var dates = data.dates;\n    var strat = cfg.strategy;\n    var p = Object.assign({}, DEFAULTS[strat] || {}, (cfg.params || {})[strat] || {});\n    var cost = Object.assign({}, COSTS, cfg.costs || {});\n    var tickers = (cfg.tickers || []).filter(function (t) { return data.tickers[t]; });\n    var N = tickers.length;\n    var capital = +cfg.capital || 10000, topup = +cfg.topup || 0;\n    var start = 0;\n    while (start < dates.length && dates[start] < cfg.start) start++;\n    var end = dates.length - 1;\n    if (cfg.end) while (end > 0 && dates[end] > cfg.end) end--;\n    var res = { strategy: strat, name: NAMES[strat], start: dates[start] || null, end: dates[end] || null, equity: [], trades: [], next: [], positions: {}, cash: capital, contributed: capital, metrics: null, tickers: tickers };\n    if (!N || start > end) { res.metrics = metrics(res, []); return res; }\n\n    // indicators per ticker\n    var ind = {};\n    tickers.forEach(function (t) {\n      var s = data.tickers[t];\n      ind[t] = {\n        sma: sma(s.cf, strat === 'dip' ? p.trend : (p.sma || 200)),\n        exit: strat === 'dip' ? sma(s.cf, p.exitSma) : null,\n        hi: strat === 'dip' ? rollMax(s.h.map(function (x, i) { return x != null ? x : s.cf[i]; }), p.lookback) : null,\n      };\n    });\n\n    var cash = capital, contributed = capital, pos = {}, pending = [], trades = [], eq = [], flows = [], fees = 0, divs = 0, exits = [];\n    var lastEq = capital, prevIdx = 1, peak = 1, maxDD = 0, invSum = 0;\n\n    function value(i) { var v = cash; for (var t in pos) v += pos[t].qty * (data.tickers[t].cf[i] || 0); return v; }\n\n    function fill(o, i) {\n      var s = data.tickers[o.t], open = s.o[i];\n      if (open == null) return false;                     // no trading in this stock today: try again tomorrow\n      if (o.side === 'sell') {\n        var ps = pos[o.t];\n        if (!ps) return true;\n        var q = Math.min(o.qty || ps.qty, ps.qty);\n        var px = open * (1 - cost.slip), val = q * px, f = fee(val, cost);\n        cash += val - f; fees += f;\n        var costPart = ps.cost * (q / ps.qty);\n        if (q >= ps.qty) { exits.push({ t: o.t, pnl: val - f - ps.cost, days: i - ps.at }); delete pos[o.t]; }\n        else { ps.qty -= q; ps.cost -= costPart; }\n        trades.push({ d: dates[i], t: o.t, side: 'sell', qty: q, px: r2(px), fee: r2(f), value: r2(val), why: o.why, strategy: strat });\n        return true;\n      }\n      var bpx = open * (1 + cost.slip);\n      var budget = Math.min(o.value, cash);\n      var qty = Math.floor(budget / (bpx * (1 + cost.feePct)));\n      while (qty > 0 && qty * bpx + fee(qty * bpx, cost) > cash) qty--;\n      if (qty <= 0) return true;                          // not enough cash: drop the order\n      var bval = qty * bpx, bf = fee(bval, cost);\n      cash -= bval + bf; fees += bf;\n      var cur = pos[o.t];\n      if (cur) { cur.qty += qty; cur.cost += bval + bf; }\n      else pos[o.t] = { qty: qty, cost: bval + bf, at: i, entry: bpx };\n      trades.push({ d: dates[i], t: o.t, side: 'buy', qty: qty, px: r2(bpx), fee: r2(bf), value: r2(bval), why: o.why, strategy: strat });\n      return true;\n    }\n\n    function signals(i) {\n      var orders = [], E = value(i), slot = E / N, d = dates[i];\n      var newMonth = i === start || monthOf(d) !== monthOf(dates[i - 1]);\n      tickers.forEach(function (t) {\n        var s = data.tickers[t], c = s.c[i], held = pos[t], m = ind[t];\n        if (c == null) return;\n        if (strat === 'trend') {\n          var a = m.sma[i];\n          if (a == null) return;\n          if (!held && c > a * (1 + p.band)) orders.push({ t: t, side: 'buy', value: slot, why: 'Closed above its ' + p.sma + '-day average (' + r2(a) + ')' });\n          else if (held && c < a * (1 - p.band)) orders.push({ t: t, side: 'sell', qty: held.qty, why: 'Closed below its ' + p.sma + '-day average (' + r2(a) + ')' });\n        } else if (strat === 'dip') {\n          var tr = m.sma[i], hi = m.hi[i], ex = m.exit[i];\n          if (!held) {\n            if (tr != null && hi != null && c > tr && c <= hi * (1 - p.drop)) orders.push({ t: t, side: 'buy', value: slot, why: 'Fell ' + Math.round((1 - c / hi) * 100) + '% from its ' + p.lookback + '-day high while above its ' + p.trend + '-day average' });\n          } else {\n            var why = c <= held.entry * (1 - p.stop) ? 'Stop-loss: ' + Math.round(p.stop * 100) + '% below the buy price'\n              : (ex != null && c > ex && i > held.at) ? 'Bounced back above its ' + p.exitSma + '-day average'\n              : i - held.at >= p.maxDays ? 'Held ' + p.maxDays + ' trading days' : null;\n            if (why) orders.push({ t: t, side: 'sell', qty: held.qty, why: why });\n          }\n        }\n      });\n      if ((strat === 'monthly' || strat === 'hold') && newMonth) {\n        if (strat === 'hold') {\n          var t0 = tickers[0], c0 = data.tickers[t0].c[i];\n          if (c0 != null && cash > cost.feeMin * 20) orders.push({ t: t0, side: 'buy', value: cash, why: i === start ? 'Buy and hold' : 'Monthly top-up' });\n        } else {\n          tickers.forEach(function (t) {\n            var c = data.tickers[t].c[i];\n            if (c == null) return;\n            var have = pos[t] ? pos[t].qty * c : 0, diff = slot - have;\n            if (Math.abs(diff) < Math.max(slot * p.drift, cost.feeMin * 20)) return;\n            if (diff < 0) orders.push({ t: t, side: 'sell', qty: Math.floor(-diff / c), why: 'Monthly rebalance to equal weight' });\n            else orders.push({ t: t, side: 'buy', value: diff, why: have ? 'Monthly rebalance to equal weight' : (i === start ? 'Monthly invest: first buy' : 'Monthly invest') });\n          });\n        }\n      }\n      return orders.filter(function (o) { return o.side === 'buy' || o.qty > 0; });\n    }\n\n    for (var i = start; i <= end; i++) {\n      var d = dates[i], flow = 0;\n      if (i > start && topup > 0 && monthOf(d) !== monthOf(dates[i - 1])) { cash += topup; contributed += topup; flow = topup; }\n      for (var t in pos) { var dv = data.tickers[t].div[i]; if (dv) { cash += pos[t].qty * dv; divs += pos[t].qty * dv; } }\n      if (pending.length) {\n        var sells = pending.filter(function (o) { return o.side === 'sell'; }), buys = pending.filter(function (o) { return o.side === 'buy'; });\n        pending = sells.concat(buys).filter(function (o) { return !fill(o, i); });\n      }\n      var E = value(i);\n      var inv = E - cash;\n      invSum += E > 0 ? inv / E : 0;\n      var idx = i === start ? 1 : prevIdx * ((E - flow) / lastEq);\n      if (!isFinite(idx)) idx = prevIdx;\n      peak = Math.max(peak, idx); maxDD = Math.max(maxDD, 1 - idx / peak);\n      prevIdx = idx; lastEq = E;\n      eq.push({ d: d, v: r2(E), x: idx });\n      flows.push(flow);\n      var orders = signals(i);\n      // a new signal replaces an older unfilled one for the same stock\n      orders.forEach(function (o) { pending = pending.filter(function (q) { return q.t !== o.t; }); });\n      pending = pending.concat(orders);\n    }\n\n    res.equity = eq;\n    res.trades = trades;\n    res.next = pending.map(function (o) { return { t: o.t, side: o.side, qty: o.qty || null, value: o.value ? r2(o.value) : null, why: o.why, strategy: strat }; });\n    res.cash = r2(cash);\n    res.contributed = r2(contributed);\n    res.fees = r2(fees);\n    res.dividends = r2(divs);\n    var lastI = end;\n    Object.keys(pos).forEach(function (t) {\n      var ps = pos[t], c = data.tickers[t].cf[lastI];\n      res.positions[t] = { qty: ps.qty, cost: r2(ps.cost), value: r2(ps.qty * c), price: c, since: dates[ps.at], pnl: r2(ps.qty * c - ps.cost) };\n    });\n    res.metrics = metrics(res, exits, invSum / Math.max(1, eq.length), maxDD);\n    return res;\n  }\n\n  function metrics(res, exits, exposure, maxDD) {\n    var eq = res.equity;\n    if (!eq.length) return { final: res.cash, profit: 0, ret: 0, cagr: null, maxDD: 0, trades: 0, winRate: null, exposure: 0, fees: 0 };\n    var a = eq[0], z = eq[eq.length - 1];\n    var years = (Date.parse(z.d) - Date.parse(a.d)) / (365.25 * 864e5);\n    var wins = exits.filter(function (e) { return e.pnl > 0; }).length;\n    return {\n      final: z.v, profit: r2(z.v - res.contributed), ret: z.x - 1,\n      cagr: years >= 0.25 ? Math.pow(z.x, 1 / years) - 1 : null,\n      maxDD: maxDD || 0, trades: res.trades.length, roundTrips: exits.length,\n      winRate: exits.length ? wins / exits.length : null,\n      avgDays: exits.length ? exits.reduce(function (s, e) { return s + e.days; }, 0) / exits.length : null,\n      exposure: exposure || 0, fees: res.fees || 0, dividends: res.dividends || 0, years: years,\n    };\n  }\n\n  // run every strategy plus the benchmark over the same window\n  function compare(bars, cfg) {\n    var data = align(bars, cfg.tickers.concat(cfg.bench ? [cfg.bench] : []));\n    var out = {};\n    STRATS.forEach(function (s) { out[s] = simulate(data, Object.assign({}, cfg, { strategy: s })); });\n    if (cfg.bench && data.tickers[cfg.bench]) out.bench = simulate(data, Object.assign({}, cfg, { strategy: 'hold', tickers: [cfg.bench] }));\n    return { data: data, results: out };\n  }\n\n  return { STRATS: STRATS, NAMES: NAMES, DEFAULTS: DEFAULTS, COSTS: COSTS, sma: sma, rollMax: rollMax, align: align, simulate: simulate, compare: compare };\n})();\n";
+'use strict';
+(() => {
+const E = new Function(ENGINE_SRC + '\n;return KabuEngine;')();
+const APP_VERSION = 'v2';
+const BRIDGE_VERSION = 2;                                // the bridge script this page ships with
+// Inside the Android app (kabu-android) the page talks to the app through window.KabuNative.
+const NATIVE = window.KabuNative || null;
+const native = (fn, ...a) => { try { return NATIVE && typeof NATIVE[fn] === 'function' ? NATIVE[fn](...a) : null; } catch (e) { return null; } };
+const nativeInfo = () => { try { return JSON.parse(native('info') || 'null'); } catch (e) { return null; } };
+const $ = (s, r = document) => r.querySelector(s);
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : String(v));
+  }
+  for (const c of kids.flat(3)) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return el;
+}
+const NS = 'http://www.w3.org/2000/svg';
+function sv(tag, attrs, ...kids) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v != null) el.setAttribute(k, String(v));
+  for (const c of kids.flat(3)) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return el;
+}
+const ICON = {
+  home: 'M4 11l8-7 8 7M6 9.5V20h12V9.5',
+  compare: 'M4 19h16M5 16l4-5 3 3 6-8',
+  stocks: 'M5 20V10M10 20V5M15 20v-8M20 20v-5',
+  log: 'M7 4h10v16l-2.5-1.5L12 20l-2.5-1.5L7 20zM9.5 8.5h5M9.5 12h5',
+  gear: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7',
+  refresh: 'M19 8a8 8 0 1 0 1 6M19 3v5h-5',
+  help: 'M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.5',
+  close: 'M6 6l12 12M18 6L6 18',
+};
+const icon = (k, sw = 1.8) => sv('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': sw, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' }, sv('path', { d: ICON[k] }));
+
+// ---------- storage ----------
+const ls = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+const idb = (() => {
+  let p = null;
+  const open = () => p || (p = new Promise((res, rej) => { const r = indexedDB.open('kabu', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }));
+  const tx = (mode, fn) => open().then(db => new Promise((res, rej) => { const t = db.transaction('kv', mode); const q = fn(t.objectStore('kv')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }));
+  return { get: k => tx('readonly', s => s.get(k)).catch(() => null), set: (k, v) => tx('readwrite', s => s.put(v, k)).catch(() => null) };
+})();
+const rndHex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
+
+// ---------- state ----------
+const DEFAULT_CFG = { tickers: ['BHP', 'CBA', 'CSL', 'NAB', 'WBC', 'ANZ', 'WES', 'MQG', 'RIO', 'WOW', 'TLS', 'FMG'], bench: 'IOZ', capital: 10000, topup: 0, costs: { feePct: 0.001, feeMin: 5, slip: 0.0005 }, params: {}, paperStart: null, email: true, appUrl: '' };
+const S = {
+  tab: ls.get('kabu.tab', 'home'), right: ls.get('kabu.right', 'compare'), period: ls.get('kabu.period', '5y'),
+  cfg: Object.assign({}, DEFAULT_CFG, ls.get('kabu.cfg', {})),
+  br: Object.assign({ url: '', secret: '', useGet: false }, ls.get('kabu.bridge', {})),
+  bars: {}, barsAt: 0, status: null, trigger: null, busy: '', sheet: null, logSrc: null, logStrat: 'all', stockStrat: 'trend', tip: null,
+  brVersion: null, update: null,
+};
+if (!S.br.secret) { S.br.secret = rndHex(18); ls.set('kabu.bridge', S.br); }
+const saveBr = () => ls.set('kabu.bridge', S.br);
+const siteUrl = () => (NATIVE ? (nativeInfo() || {}).site || '' : location.origin + location.pathname);
+const tickersAll = () => S.cfg.tickers.concat(S.cfg.bench ? [S.cfg.bench] : []);
+const sydToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
+// ---------- formatting ----------
+const money = (v, dp = 0) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-AU', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const pct = (x, dp = 1) => { if (x == null || !isFinite(x)) return '—'; const t = Math.abs(x * 100).toFixed(dp); return (+t === 0 ? '' : x > 0 ? '+' : '−') + t + '%'; };
+const sgn = x => (x > 0 ? 'up' : x < 0 ? 'down' : '');
+const dayLabel = (d, year) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-AU', Object.assign({ weekday: 'short', day: 'numeric', month: 'short' }, year ? { year: 'numeric' } : {})) : '';
+const shortDay = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' }) : '';
+const NAME = { trend: 'Trend filter', monthly: 'Monthly invest', dip: 'Dip buying' };
+const benchName = () => (/^(IOZ|A200|STW|VAS)$/.test(S.cfg.bench) ? 'ASX 200 · ' : 'Benchmark · ') + S.cfg.bench;
+const nameOf = k => (k === 'bench' ? benchName() : NAME[k]);
+const P = k => Object.assign({}, E.DEFAULTS[k], (S.cfg.params || {})[k] || {});
+const RULES = {
+  trend: () => { const p = P('trend'); return [`Each stock gets an equal share of the money.`, `Buy when it closes above its ${p.sma}-day average${p.band ? ` by more than ${p.band * 100}%` : ''}.`, `Sell when it closes below it${p.band ? ` by more than ${p.band * 100}%` : ''}, and sit in cash until it climbs back.`]; },
+  monthly: () => { const p = P('monthly'); return [`Always invested: equal amounts in every stock on the list.`, `On the first trading day of each month, add the monthly top-up and rebalance any stock that has drifted more than ${Math.round(p.drift * 100)}% from its share.`]; },
+  dip: () => { const p = P('dip'); return [`Buy a stock after it falls ${Math.round(p.drop * 100)}% or more from its ${p.lookback}-day high, but only while it's above its ${p.trend}-day average (the long-term trend is up).`, `Sell when it bounces back above its ${p.exitSma}-day average, after ${p.maxDays} trading days, or if it falls ${Math.round(p.stop * 100)}% below the buy price.`]; },
+};
+const SHORT = { trend: 'Ride the trend, sidestep long falls', monthly: 'Always invested, rebalanced monthly', dip: 'Buy sharp drops in an uptrend' };
+
+// ---------- the bridge ----------
+const normUrl = u => String(u || '').trim().replace(/[?#].*$/, '').replace(/\/macros\/u\/\d+\/s\//, '/macros/s/');
+async function brFetch(url, init) {
+  let r;
+  try { r = await fetch(url, init); } catch (e) { throw { code: 'network', message: String((e && e.message) || e) }; }
+  const text = await r.text().catch(() => '');
+  let j;
+  try { j = JSON.parse(text); } catch (e) {
+    if (/Kabu bridge( v\d+)? is running/i.test(text)) throw { code: 'banner' };
+    throw { code: /accounts\.google\.com|ServiceLogin|Sign in/i.test(text) ? 'signin' : 'bad_reply', message: 'HTTP ' + r.status };
+  }
+  if (!j || !j.ok) throw { code: j && j.error === 'bad_secret' ? 'bad_secret' : 'bridge', message: (j && j.error) || 'unknown error' };
+  return j;
+}
+async function bridge(op, extra) {
+  const url = normUrl(S.br.url);
+  if (!url) throw { code: 'no_bridge' };
+  const body = JSON.stringify(Object.assign({ op }, extra || {}, { secret: S.br.secret }));
+  if (!S.br.useGet) {
+    try { return await brFetch(url, { method: 'POST', body }); } catch (e) { if (e.code !== 'banner') throw e; }
+  }
+  const q = url + '?p=' + encodeURIComponent(body);
+  if (q.length > 7000) throw { code: 'too_big' };
+  const j = await brFetch(q, { method: 'GET' });
+  if (!S.br.useGet) { S.br.useGet = true; saveBr(); }
+  return j;
+}
+function brMsg(e) {
+  const m = String((e && e.message) || '');
+  switch (e && e.code) {
+    case 'no_bridge': return 'Set up the bridge first: Settings → Bridge.';
+    case 'network': return "Couldn't reach the bridge. Check you're online and the URL ends in /exec.";
+    case 'signin': return 'Google asked for a sign-in. In Apps Script set Who has access to Anyone, then deploy a new version.';
+    case 'bad_secret': return 'The bridge has a different key. Copy the bridge script again, paste it over the old code and deploy a new version.';
+    case 'bad_reply': return "That URL didn't answer like Kabu's bridge. Use the Web app URL that ends in /exec.";
+    case 'too_big': return 'That request is too big for this connection.';
+  }
+  if (m === 'busy') return 'The bridge is busy (the bot may be running). Try again in a minute.';
+  if (/yahoo|prices_failed/.test(m)) return "Yahoo Finance didn't answer (it limits how often it can be asked). Try again in a few minutes." + (/unknown_ticker/.test(m) ? ' ' + m.replace(/.*unknown_ticker (\S+).*/, '$1 isn\'t an ASX code Yahoo knows.') : '');
+  if (/unknown_ticker/.test(m)) return m.replace(/.*unknown_ticker (\S+).*/, '$1 isn\'t an ASX code Yahoo knows.');
+  if (/permission|authori[sz]/i.test(m)) return 'The bridge needs permission: in Apps Script pick setupKabu, press Run and allow access.';
+  return 'The bridge said: ' + m;
+}
+
+// ---------- prices and results ----------
+let memo = {};
+const invalidate = () => { memo = {}; };
+function dataFor() {
+  if (!memo.data) memo.data = E.align(S.bars, tickersAll().filter(t => S.bars[t]));
+  return memo.data;
+}
+const lastDate = () => dataFor().dates.at(-1) || null;
+function periodStart(p) {
+  const d = dataFor().dates;
+  if (d.length < 220) return null;
+  const yrs = { '1y': 1, '3y': 3, '5y': 5, '10y': 10 }[p] || 5;
+  const target = new Date(Date.parse(d.at(-1)) - yrs * 365.25 * 864e5).toISOString().slice(0, 10);
+  const first = d[210];                                   // the 200-day averages need some history first
+  const s = d.find(x => x >= target) || d[0];
+  return s < first ? first : s;
+}
+function results(mode) {
+  const key = mode === 'paper' ? 'paper' : 'bt:' + S.period;
+  if (memo[key] !== undefined) return memo[key];
+  const data = dataFor();
+  const start = mode === 'paper' ? S.cfg.paperStart : periodStart(S.period);
+  if (!start || !data.dates.length || start > data.dates.at(-1)) return (memo[key] = null);
+  const base = { tickers: S.cfg.tickers.filter(t => S.bars[t]), start, capital: S.cfg.capital, topup: S.cfg.topup, costs: S.cfg.costs, params: S.cfg.params };
+  const r = {};
+  E.STRATS.forEach(k => { r[k] = E.simulate(data, Object.assign({}, base, { strategy: k })); });
+  if (S.bars[S.cfg.bench]) r.bench = E.simulate(data, Object.assign({}, base, { strategy: 'hold', tickers: [S.cfg.bench] }));
+  return (memo[key] = r);
+}
+async function loadBars(force) {
+  if (!normUrl(S.br.url)) return;
+  const want = tickersAll();
+  const missing = want.filter(t => !S.bars[t]);
+  if (!force && !missing.length && Date.now() - S.barsAt < 3 * 3600e3) return;
+  S.busy = missing.length > 2 ? `Loading 10 years of prices for ${missing.length} stocks. The first time takes about half a minute.` : 'Updating prices…';
+  draw();
+  try {
+    const j = await bridge('bars', { tickers: want, refresh: !!force });
+    const errs = j.bars._errors || [], stale = j.bars._stale || [];
+    delete j.bars._errors; delete j.bars._stale;
+    const keep = {};
+    want.forEach(t => { if (j.bars[t]) keep[t] = j.bars[t]; else if (S.bars[t]) keep[t] = S.bars[t]; });
+    S.bars = keep;
+    S.barsAt = Date.now();
+    await idb.set('bars', { at: S.barsAt, bars: S.bars });
+    if (errs.length) toast("Couldn't load " + errs.map(x => x.split(':')[0]).join(', ') + '. ' + brMsg({ message: errs.join(' ') }));
+    else if (stale.length) toast("Couldn't refresh " + stale.map(x => x.split(' ')[0]).join(', ') + ' (Yahoo is busy). Showing prices up to ' + shortDay(stale[0].split(' ')[1]) + '.');
+  } catch (e) { toast(brMsg(e)); }
+  S.busy = '';
+  invalidate();
+  draw();
+}
+async function loadStatus() {
+  if (!normUrl(S.br.url)) return;
+  try {
+    const j = await bridge('status');
+    S.status = j.status;
+    S.trigger = j.trigger;
+    S.brVersion = j.version || 1;
+    if (j.config) { S.cfg = Object.assign({}, DEFAULT_CFG, j.config); ls.set('kabu.cfg', S.cfg); invalidate(); }
+  } catch (e) { S.status = { error: brMsg(e), at: null }; }
+  draw();
+}
+let pushT = null;
+function saveCfg(patch, now) {
+  S.cfg = Object.assign({}, S.cfg, patch);
+  ls.set('kabu.cfg', S.cfg);
+  invalidate();
+  draw();
+  clearTimeout(pushT);
+  if (!normUrl(S.br.url)) return Promise.resolve();
+  return new Promise(res => {
+    pushT = setTimeout(async () => {
+      try { const j = await bridge('config', { set: Object.assign({}, S.cfg, { appUrl: siteUrl() }) }); S.cfg = Object.assign({}, DEFAULT_CFG, j.config); ls.set('kabu.cfg', S.cfg); invalidate(); }
+      catch (e) { toast("Couldn't save to the bridge: " + brMsg(e)); }
+      res();
+      draw();
+    }, now ? 0 : 500);
+  });
+}
+
+// ---------- charts ----------
+const after = [];
+function niceTicks(lo, hi, n = 4) {
+  const span = hi - lo || Math.abs(hi) || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+// series: [{ key, label, pts: [{d, v}], dash, thin, c }]; all series share the same dates
+function chart(series, opts = {}) {
+  const box = h('div', { class: 'chart', role: 'img', 'aria-label': opts.label || 'Chart' });
+  after.push(() => drawChart(box, series, opts));
+  return box;
+}
+function drawChart(box, series, opts) {
+  const W = Math.max(240, box.clientWidth), H = opts.h || 220, L = opts.left ?? 54, R = opts.right ?? 8, T = 10, B = 24;
+  const base = series[0] ? series[0].pts : [];
+  if (base.length < 2) { box.replaceChildren(h('p', { class: 'muted', text: 'Not enough data yet.' })); return; }
+  const n = base.length, step = Math.max(1, Math.ceil(n / ((W - L - R) / 1.5)));
+  const idx = [];
+  for (let i = 0; i < n; i += step) idx.push(i);
+  if (idx.at(-1) !== n - 1) idx.push(n - 1);
+  let lo = Infinity, hi = -Infinity;
+  series.forEach(s => idx.forEach(i => { const v = s.pts[i] && s.pts[i].v; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
+  if (opts.zero != null) { lo = Math.min(lo, opts.zero); hi = Math.max(hi, opts.zero); }
+  const pad = (hi - lo) * 0.06 || 1;
+  lo -= pad; hi += pad;
+  const X = i => L + (i / (n - 1)) * (W - L - R), Y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const fmt = opts.fmt || (v => money(v));
+  const ticks = niceTicks(lo, hi, 4);
+  const yrs = Date.parse(base.at(-1).d) - Date.parse(base[0].d) > 400 * 864e5;
+  const xt = [];
+  let last = '';
+  base.forEach((p, i) => { const k = yrs ? p.d.slice(0, 4) : p.d.slice(0, 7); if (k !== last) { if (last) xt.push(i); last = k; } });
+  const xk = Math.max(1, Math.ceil(xt.length / Math.floor((W - L - R) / 56)));
+  const svg = sv('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` },
+    sv('g', { class: 'grid' }, ticks.map(t => sv('line', { x1: L, x2: W - R, y1: Y(t), y2: Y(t) }))),
+    sv('g', { class: 'axis' },
+      ticks.map(t => sv('text', { x: L - 6, y: Y(t) + 3.5, 'text-anchor': 'end' }, fmt(t))),
+      xt.filter((_, j) => j % xk === 0).map(i => sv('text', { x: X(i), y: H - 6, 'text-anchor': 'middle' }, yrs ? base[i].d.slice(0, 4) : new Date(base[i].d + 'T00:00:00').toLocaleDateString('en-AU', { month: 'short' })))),
+    series.map(s => sv('path', { class: 'ser' + (s.dash ? ' bench' : '') + (s.thin ? ' thin' : ''), 'data-s': s.key, style: s.c ? `--c:${s.c}` : null,
+      d: idx.filter(i => s.pts[i] && s.pts[i].v != null).map((i, j) => (j ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(s.pts[i].v).toFixed(1)).join(' ') })),
+    (opts.marks || []).map(m => { const i = m.i; if (i == null || i < 0 || i >= n) return null; const x = X(i), y = Y(m.v); return sv('path', { class: m.side === 'buy' ? 'mk-b' : 'mk-s', d: m.side === 'buy' ? `M${x - 5} ${y + 11}L${x + 5} ${y + 11}L${x} ${y + 3}Z` : `M${x - 5} ${y - 11}L${x + 5} ${y - 11}L${x} ${y - 3}Z` }); }));
+  const xh = sv('line', { class: 'xh', y1: T, y2: H - B, x1: 0, x2: 0, visibility: 'hidden' });
+  const pts = series.map(s => sv('circle', { class: 'pt', r: 4, cx: 0, cy: 0, visibility: 'hidden', 'data-s': s.key, style: s.c ? `--c:${s.c}` : null }));
+  svg.append(xh, ...pts);
+  const tip = h('div', { class: 'tip', hidden: true });
+  const show = ev => {
+    const r = svg.getBoundingClientRect();
+    const i = Math.max(0, Math.min(n - 1, Math.round(((ev.clientX - r.left - L) / (W - L - R)) * (n - 1))));
+    const x = X(i);
+    xh.setAttribute('x1', x); xh.setAttribute('x2', x); xh.setAttribute('visibility', 'visible');
+    series.forEach((s, k) => { const v = s.pts[i] && s.pts[i].v; pts[k].setAttribute('visibility', v == null ? 'hidden' : 'visible'); if (v != null) { pts[k].setAttribute('cx', x); pts[k].setAttribute('cy', Y(v)); } });
+    tip.replaceChildren(h('div', { text: dayLabel(base[i].d, true) }), ...series.map(s => h('div', { class: 'r' }, h('span', { class: 'dot', 'data-s': s.key, style: s.c ? `--c:${s.c}` : null }), (s.label ? s.label + ' ' : '') + (s.pts[i] && s.pts[i].v != null ? fmt(s.pts[i].v) : '—'))));
+    tip.hidden = false;
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.max(tw / 2, Math.min(W - tw / 2, x)) + 'px';
+  };
+  const hide = () => { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); pts.forEach(p => p.setAttribute('visibility', 'hidden')); };
+  svg.addEventListener('pointermove', show);
+  svg.addEventListener('pointerdown', show);
+  svg.addEventListener('pointerleave', hide);
+  svg.addEventListener('pointerup', ev => { if (ev.pointerType !== 'mouse') setTimeout(hide, 1800); });
+  box.replaceChildren(svg, tip);
+}
+function spark(pts, key) {
+  if (!pts || pts.length < 2) return null;
+  const W = 300, H = 34, n = pts.length;
+  let lo = Infinity, hi = -Infinity;
+  pts.forEach(p => { lo = Math.min(lo, p.v); hi = Math.max(hi, p.v); });
+  const step = Math.max(1, Math.ceil(n / 120));
+  const d = [];
+  for (let i = 0; i < n; i += step) d.push(i);
+  if (d.at(-1) !== n - 1) d.push(n - 1);
+  const Y = v => 3 + (1 - (v - lo) / (hi - lo || 1)) * (H - 6);
+  return sv('svg', { class: 'spark', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', 'aria-hidden': 'true' },
+    sv('path', { d: d.map((i, j) => (j ? 'L' : 'M') + ((i / (n - 1)) * W).toFixed(1) + ' ' + Y(pts[i].v).toFixed(1)).join(' '), fill: 'none', stroke: `var(--s-${key})`, 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke' }));
+}
+
+// ---------- shared bits ----------
+const card = (title, extra, ...kids) => h('section', { class: 'card' }, h('div', { class: 'card-head' }, h('h2', { text: title }), extra), ...kids);
+const legend = keys => h('div', { class: 'legend', 'aria-hidden': 'true' }, keys.map(k => h('span', { 'data-s': k }, h('i', { class: 'ln' + (k === 'bench' ? ' dash' : '') }), nameOf(k))));
+function orderRow(o) {
+  const what = o.side === 'buy' ? `${o.t} · about ${money(o.value)}` : `${o.t}${o.qty ? ' · ' + o.qty + ' shares' : ''}`;
+  return h('div', { class: 'order', 'data-s': o.strategy },
+    h('span', { class: 'dot', title: NAME[o.strategy] }),
+    h('span', { class: 'side ' + o.side, text: o.side.toUpperCase() }),
+    h('span', { class: 'what', text: what }),
+    h('span', { class: 'why', text: NAME[o.strategy] + ': ' + o.why }));
+}
+function tradeRow(t) {
+  return h('div', { class: 'log-row', 'data-s': t.strategy },
+    h('span', { class: 'd', text: shortDay(t.d) }),
+    h('span', { class: 't' }, h('span', { class: 'dot', title: NAME[t.strategy] }), ' ', h('b', { class: t.side === 'sell' ? 'down' : null, text: t.side === 'buy' ? 'BUY ' : 'SELL ' }), `${t.qty} ${t.t} @ $${t.px.toFixed(2)}`),
+    h('span', { class: 'v', text: money(t.value) }),
+    h('span', { class: 'why', text: t.why + (t.fee ? ` · fee ${money(t.fee, 2)}` : '') }));
+}
+const needBridge = () => h('section', { class: 'notice' },
+  h('b', { text: 'Connect the bridge to load real ASX prices' }),
+  h('p', { class: 'muted', text: 'Kabu gets daily prices and runs its paper-trading bot through a small Google script in your own account. It takes about five minutes, once.' }),
+  h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => go('settings') }, 'Set up the bridge')));
+
+// ---------- views ----------
+function viewHome() {
+  const out = [];
+  if (!normUrl(S.br.url)) {
+    out.push(card('Welcome to Kabu', null,
+      h('p', { class: 'muted', text: 'Kabu tests three simple trading rules on real ASX prices: first on the last ten years, then live with paper money, so you can see what they would really do before any real money is involved.' }),
+      h('ol', { class: 'steps' }, h('li', { text: 'Connect the bridge (Settings). It loads prices and runs the bot after every close.' }), h('li', { text: 'Compare the three strategies against the ASX 200.' }), h('li', { text: 'Start paper trading. Each evening the bot checks the rules and emails you what it did.' })),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: () => go('settings') }, 'Set up the bridge'), h('button', { class: 'btn', type: 'button', onclick: () => openHelp() }, 'How it works'))));
+    return out;
+  }
+  if (S.busy) out.push(h('section', { class: 'notice', id: 'busy' }, h('span', { class: 'muted', text: S.busy })));
+  const ub = updateBanner();
+  if (ub) out.push(ub);
+  if (S.brVersion && S.brVersion < BRIDGE_VERSION) out.push(bridgeUpdateNote());
+  const last = lastDate();
+  const ps = S.cfg.paperStart;
+  if (!ps) {
+    const bt = results('bt');
+    out.push(card('Paper trading', h('span', { class: 'lbl', text: 'not started' }),
+      h('p', { class: 'muted', text: 'Paper trading runs the three strategies forward from today with pretend money, on real prices. Nothing is bought or sold for real.' }),
+      bt ? h('div', { class: 'stack' }, h('span', { class: 'lbl', text: `How they did over ${S.period.toUpperCase()}` }), ...['trend', 'monthly', 'dip', 'bench'].filter(k => bt[k]).map(k => h('div', { class: 'row', 'data-s': k }, h('span', { class: 'dot' }), h('span', { class: 'grow', text: nameOf(k) }), h('span', { class: 'mono ' + sgn(bt[k].metrics.ret), text: pct(bt[k].metrics.ret) })))) : null,
+      h('div', { class: 'row' },
+        h('button', { class: 'btn primary', type: 'button', id: 'start-paper', disabled: !last, onclick: startPaper }, 'Start paper trading'),
+        h('button', { class: 'btn', type: 'button', onclick: () => go('compare') }, 'Compare first'))));
+    return out;
+  }
+  const pr = results('paper');
+  if (!pr) {
+    let first = ps;
+    while ([0, 6].includes(new Date(first + 'T00:00:00').getDay())) first = new Date(Date.parse(first + 'T00:00:00Z') + 864e5).toISOString().slice(0, 10);
+    out.push(card('Paper trading', h('span', { class: 'lbl', text: 'starting' }),
+      h('p', { class: 'muted', id: 'paper-wait', text: `Paper trading starts at the close on ${dayLabel(first)}${first === sydToday() ? ' (today)' : ''}. The bot checks the rules then, emails you its first paper orders, and they fill at the next morning's open.` })));
+  } else {
+    const days = pr.trend.equity.length;
+    const next = E.STRATS.flatMap(k => pr[k].next);
+    out.push(card('Next open', h('span', { class: 'lbl', text: 'after ' + dayLabel(last) }),
+      next.length ? h('div', { class: 'orders', id: 'next-orders' }, next.map(orderRow)) : h('p', { class: 'muted', id: 'next-orders', text: 'No orders: every rule says hold.' })));
+    out.push(h('section', { class: 'card', id: 'paper-card' },
+      h('div', { class: 'card-head' }, h('h2', { text: 'Paper money' }), h('span', { class: 'lbl', text: `day ${days} · since ${shortDay(ps)}` })),
+      ['trend', 'monthly', 'dip'].map(k => {
+        const r = pr[k], m = r.metrics, eq = r.equity, today = eq.length > 1 ? eq.at(-2).v * (eq.at(-1).x / eq.at(-2).x - 1) : 0;   // market move only, not the top-up
+        return h('button', { class: 'strat', type: 'button', 'data-s': k, onclick: () => openStrategy(k, 'paper') },
+          h('span', { class: 'nm' }, h('span', { class: 'dot' }), NAME[k]),
+          h('span', { class: 'val', text: money(m.final) }),
+          h('span', { class: 'sub' }, h('span', { class: sgn(m.profit) }, (m.profit >= 0 ? '+' : '') + money(m.profit) + ' · ' + pct(m.ret)), h('span', { text: 'last close ' + (today >= 0 ? '+' : '') + money(today) }), h('span', { text: Object.keys(r.positions).length + ' held · ' + money(r.cash) + ' cash' })),
+          spark(eq, k));
+      }),
+      pr.bench ? h('div', { class: 'row', 'data-s': 'bench' }, h('span', { class: 'dot' }), h('span', { class: 'grow muted', text: benchName() + ' over the same days' }), h('span', { class: 'mono ' + sgn(pr.bench.metrics.ret), text: pct(pr.bench.metrics.ret) })) : null));
+  }
+  out.push(botCard());
+  out.push(h('p', { class: 'muted foot', text: 'Paper money only. Not financial advice.' }));
+  return out;
+}
+const whenRan = at => { const m = /^(\d{4}-\d\d-\d\d) (\d\d:\d\d)$/.exec(at || ''); return m ? (m[1] === sydToday() ? 'today' : dayLabel(m[1])) + ' at ' + m[2] : at; };
+function botCard() {
+  const st = S.status;
+  const kids = [];
+  if (S.trigger === false) kids.push(h('p', { class: 'err', id: 'bot-off', text: "The daily bot isn't switched on. In Apps Script pick setupKabu and press Run (once)." }));
+  if (st && st.error) kids.push(h('p', { class: 'err', text: 'Last run failed: ' + (st.error.startsWith('The bridge') || st.error.startsWith('Couldn') ? st.error : brMsg({ message: st.error })) }));
+  else if (st && st.at) kids.push(h('p', { class: 'muted', id: 'bot-last', text: `Last ran ${whenRan(st.at)}${st.day ? ' on the ' + dayLabel(st.day) + ' close' : ''}${st.today ? ` · ${st.today.length} paper trade${st.today.length === 1 ? '' : 's'}` : ''}${st.emailed ? ' · emailed you' : ''}.` }));
+  else kids.push(h('p', { class: 'muted', text: 'The bot runs after every ASX close (about 5pm Sydney time, weekdays) and emails you when it trades.' }));
+  return card('Bot', h('button', { class: 'link', type: 'button', id: 'run-now', onclick: runNow }, 'Run now'), ...kids);
+}
+function viewCompare() {
+  const out = [];
+  if (!normUrl(S.br.url)) return [needBridge()];
+  if (S.busy) out.push(h('section', { class: 'notice' }, h('span', { class: 'muted', text: S.busy })));
+  const r = results('bt');
+  const periods = ['1y', '3y', '5y', '10y'];
+  const head = h('div', { class: 'chips', role: 'group', 'aria-label': 'Period' }, periods.map(p => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(S.period === p), onclick: () => { S.period = p; ls.set('kabu.period', p); draw(); } }, p.toUpperCase())));
+  if (!r) { out.push(card('Compare', null, head, h('p', { class: 'muted', text: S.busy ? 'Loading prices…' : 'No prices yet. Tap refresh at the top.' }))); return out; }
+  const keys = ['trend', 'monthly', 'dip'].concat(r.bench ? ['bench'] : []);
+  const yrs = r.trend.metrics.years;
+  out.push(card('Compare', h('span', { class: 'lbl', text: `${shortDay(r.trend.start)} – ${shortDay(r.trend.end)}` }), head,
+    chart(keys.map(k => ({ key: k, label: nameOf(k).split(' · ')[0], dash: k === 'bench', pts: r[k].equity.map(e => ({ d: e.d, v: e.x * S.cfg.capital })) })), { h: innerWidth >= 720 ? 280 : 220, label: `Growth of ${money(S.cfg.capital)} for each strategy and the benchmark`, fmt: v => money(v) }),
+    legend(keys),
+    h('div', { class: 'scroll-x' }, h('table', { class: 'tbl', id: 'cmp-table' },
+      h('thead', null, h('tr', null, h('th', { text: 'Strategy' }), h('th', { text: 'Return' }), h('th', { text: 'A year' }), h('th', { text: 'Worst fall' }), h('th', { class: 'mid-only', text: 'Trades' }), h('th', { class: 'wide-only', text: 'Wins' }), h('th', { class: 'wide-only', text: 'In market' }), h('th', { class: 'wide-only', text: 'Fees' }))),
+      h('tbody', null, keys.map(k => { const m = r[k].metrics; return h('tr', { class: k === 'bench' ? null : 'click', 'data-s': k, onclick: k === 'bench' ? null : () => openStrategy(k, 'bt') },
+        h('td', null, h('span', { class: 'nm' }, h('span', { class: 'dot' }), nameOf(k).split(' · ')[0])),
+        h('td', { class: sgn(m.ret), text: pct(m.ret, 0) }), h('td', { class: sgn(m.cagr), text: pct(m.cagr) }), h('td', { text: pct(-m.maxDD, 0) }), h('td', { class: 'mid-only', text: String(m.trades) }),
+        h('td', { class: 'wide-only', text: m.winRate == null ? '—' : Math.round(m.winRate * 100) + '%' }), h('td', { class: 'wide-only', text: Math.round(m.exposure * 100) + '%' }), h('td', { class: 'wide-only', text: money(m.fees) }));
+      })))),
+    h('p', { class: 'muted', text: `Starting with ${money(S.cfg.capital)}${S.cfg.topup ? ` plus ${money(S.cfg.topup)} a month` : ''} over ${yrs.toFixed(1)} years. Returns are time-weighted and include dividends (not franking credits) and costs: ${(S.cfg.costs.feePct * 100).toFixed(2)}% brokerage (min ${money(S.cfg.costs.feeMin)}) and ${(S.cfg.costs.slip * 100).toFixed(2)}% slippage per trade. Past results don't predict future returns.` })));
+  const ps = S.cfg.paperStart;
+  out.push(card('Paper trading', h('span', { class: 'lbl', text: ps ? 'since ' + shortDay(ps) : 'not started' }),
+    h('p', { class: 'muted', text: ps ? 'Running all three strategies forward with paper money. Restarting begins again from today.' : 'Happy with the rules? Start running them forward with paper money from today.' }),
+    h('div', { class: 'row' }, ps ? h('button', { class: 'btn', type: 'button', onclick: confirmRestart }, 'Restart from today') : h('button', { class: 'btn primary', type: 'button', id: 'start-paper-2', onclick: startPaper }, 'Start paper trading'))));
+  return out;
+}
+function viewStocks() {
+  if (!normUrl(S.br.url)) return [needBridge()];
+  const data = dataFor(), pr = results('paper') || results('bt'), src = results('paper') ? 'paper' : 'backtest';
+  const rows = S.cfg.tickers.map(t => {
+    const s = data.tickers[t];
+    if (!s) return h('tr', null, h('td', { text: t }), h('td', { colspan: 4, class: 'muted', text: S.busy ? 'loading…' : 'no prices' }));
+    const n = data.dates.length, c = s.cf[n - 1], prev = s.cf[n - 2], a200 = E.sma(s.cf, 200)[n - 1];
+    const held = pr ? E.STRATS.filter(k => pr[k].positions[t]) : [];
+    return h('tr', { class: 'click', onclick: () => openStock(t) },
+      h('td', null, h('b', { class: 'mono', text: t })),
+      h('td', { text: '$' + c.toFixed(2) }),
+      h('td', { class: sgn(c - prev), text: pct(c / prev - 1) }),
+      h('td', { class: a200 ? sgn(c - a200) : null, text: a200 ? pct(c / a200 - 1, 0) : '—' }),
+      h('td', null, held.map(k => h('span', { class: 'dot', 'data-s': k, title: NAME[k], style: 'margin-left:3px' }))));
+  });
+  return [
+    card('Watchlist', h('span', { class: 'lbl', text: lastDate() ? 'close ' + shortDay(lastDate()) : '' }),
+      h('div', { class: 'scroll-x' }, h('table', { class: 'tbl', id: 'stocks' },
+        h('thead', null, h('tr', null, h('th', { text: 'Stock' }), h('th', { text: 'Close' }), h('th', { text: 'Day' }), h('th', { text: 'vs 200d' }), h('th', { text: 'Held' }))),
+        h('tbody', null, rows))),
+      h('p', { class: 'muted', text: `"vs 200d" is the distance from the 200-day average. Dots show which strategies hold it (${src}).` })),
+    card('Edit the list', null,
+      h('div', { class: 'tickers', id: 'tickers' }, S.cfg.tickers.map(t => h('span', { class: 'tk' }, t, h('button', { type: 'button', 'aria-label': 'Remove ' + t, onclick: () => saveCfg({ tickers: S.cfg.tickers.filter(x => x !== t) }) }, icon('close'))))),
+      (() => {
+        const inp = h('input', { id: 'add-ticker', placeholder: 'ASX code, e.g. GMG', autocapitalize: 'characters', autocomplete: 'off', maxlength: 8 });
+        const add = async () => {
+          const t = inp.value.trim().toUpperCase().replace(/\.AX$/, '').replace(/[^A-Z0-9]/g, '');
+          if (!t) return;
+          if (S.cfg.tickers.includes(t)) { toast(t + ' is already on the list.'); return; }
+          await saveCfg({ tickers: S.cfg.tickers.concat([t]) }, true);
+          loadBars();
+        };
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+        return h('div', { class: 'row' }, h('label', { class: 'field grow' }, h('span', { class: 'lbl', text: 'Add a stock' }), inp), h('button', { class: 'btn', type: 'button', style: 'align-self:flex-end', onclick: add }, 'Add'));
+      })(),
+      h('p', { class: 'muted', text: 'Changing the list changes every result, including paper trading (it is recalculated from its start date).' })),
+  ];
+}
+function viewLog() {
+  const pr = results('paper'), bt = results('bt');
+  const src = S.logSrc || (pr ? 'paper' : 'bt');
+  const r = src === 'paper' ? pr : bt;
+  const all = r ? E.STRATS.flatMap(k => r[k].trades).sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0)) : [];
+  const list = S.logStrat === 'all' ? all : all.filter(t => t.strategy === S.logStrat);
+  const shown = list.slice(0, 200);
+  return [card('Trades', h('span', { class: 'lbl', text: `${list.length} trade${list.length === 1 ? '' : 's'}` }),
+    h('div', { class: 'chips' },
+      h('button', { class: 'chip', type: 'button', 'aria-pressed': String(src === 'paper'), disabled: !pr, onclick: () => { S.logSrc = 'paper'; draw(); } }, 'Paper'),
+      h('button', { class: 'chip', type: 'button', 'aria-pressed': String(src === 'bt'), onclick: () => { S.logSrc = 'bt'; draw(); } }, 'Backtest ' + S.period.toUpperCase())),
+    h('div', { class: 'chips' }, ['all', 'trend', 'monthly', 'dip'].map(k => h('button', { class: 'chip', type: 'button', 'data-s': k, 'aria-pressed': String(S.logStrat === k), onclick: () => { S.logStrat = k; draw(); } }, k === 'all' ? null : h('span', { class: 'dot' }), k === 'all' ? 'All' : NAME[k]))),
+    list.length ? h('div', { class: 'log', id: 'trades' }, shown.map(tradeRow)) : h('p', { class: 'muted', text: src === 'paper' ? 'No paper trades yet.' : 'No trades in this period.' }),
+    list.length > shown.length ? h('p', { class: 'muted', text: `Showing the latest 200. Export for all ${list.length}.` }) : null,
+    list.length ? h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', id: 'export', onclick: () => exportCsv(list, src) }, 'Export CSV')) : null)];
+}
+function numField(label, value, onSave, opts = {}) {
+  const inp = h('input', { type: 'number', inputmode: 'decimal', step: opts.step || 'any', min: opts.min ?? 0, value: value, id: opts.id || null });
+  inp.addEventListener('change', () => { const v = parseFloat(inp.value); if (isFinite(v) && v >= (opts.min ?? 0)) onSave(v); else inp.value = value; });
+  return h('label', { class: 'field' }, h('span', { class: 'lbl', text: label }), inp);
+}
+function viewSettings() {
+  const c = S.cfg, connected = !!normUrl(S.br.url);
+  const url = h('input', { type: 'url', id: 'br-url', placeholder: 'https://script.google.com/macros/s/…/exec', value: S.br.url, autocomplete: 'off' });
+  const setP = (k, field, v) => saveCfg({ params: Object.assign({}, c.params, { [k]: Object.assign({}, (c.params || {})[k] || {}, { [field]: v }) }) });
+  const p = { trend: P('trend'), monthly: P('monthly'), dip: P('dip') };
+  return [
+    card('Bridge', h('span', { class: 'lbl', id: 'br-state', text: connected ? (S.status && S.status.error ? 'problem' : 'connected') : 'not set up' }),
+      h('ol', { class: 'steps' },
+        h('li', null, 'Tap ', h('b', { text: 'Copy bridge script' }), '.'),
+        h('li', { text: 'On a computer, open script.google.com while signed in to your personal Google account, start a New project, and paste the script over everything. Save.' }),
+        h('li', null, 'Pick ', h('b', { text: 'setupKabu' }), ' in the function menu and press ', h('b', { text: 'Run' }), '. Allow access (Advanced → Go to project if Google warns you). This switches on the daily bot.'),
+        h('li', null, h('b', { text: 'Deploy → New deployment → Web app' }), '. Execute as: Me. Who has access: Anyone. Deploy and copy the Web app URL.'),
+        h('li', { text: 'Paste it below and tap Save and test.' })),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn', type: 'button', id: 'copy-script', onclick: copyScript }, 'Copy bridge script'),
+        NATIVE ? h('button', { class: 'btn', type: 'button', onclick: () => native('share', 'Kabu bridge script', bridgeText()) }, 'Share it')
+          : navigator.share ? h('button', { class: 'btn', type: 'button', onclick: () => navigator.share({ title: 'Kabu bridge script', text: bridgeText() }).catch(() => {}) }, 'Share it') : null),
+      S.brVersion && S.brVersion < BRIDGE_VERSION ? h('p', { class: 'err', text: `Your bridge is v${S.brVersion}. Copy the new script and paste it over the old one (steps on Home).` }) : null,
+      h('label', { class: 'field' }, h('span', { class: 'lbl', text: 'Web app URL' }), url),
+      h('details', null, h('summary', null, h('span', { class: 'muted', text: 'Already have a bridge from another phone or browser?' })),
+        h('div', { class: 'stack' },
+          h('p', { class: 'muted', text: "Paste its key here so you don't have to set the bridge up again. The key is on line 3 of the script in Apps Script (var SECRET = '…')." }),
+          (() => { const k = h('input', { id: 'br-key', value: S.br.secret, autocomplete: 'off', spellcheck: 'false', maxlength: 64 }); k.addEventListener('change', () => { const v = k.value.trim().replace(/^['"]|['"]$/g, ''); if (/^[0-9a-f]{16,64}$/i.test(v)) { S.br.secret = v; saveBr(); toast('Key saved. Tap Save and test.'); } else { k.value = S.br.secret; toast('That doesn\'t look like a Kabu key (letters a–f and digits).'); } }); return h('label', { class: 'field' }, h('span', { class: 'lbl', text: 'Bridge key' }), k); })())),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', id: 'br-save', onclick: () => testBridge(url.value) }, 'Save and test'),
+        connected ? h('button', { class: 'btn', type: 'button', onclick: () => { loadBars(true); loadStatus(); } }, 'Refresh prices') : null),
+      h('p', { class: 'muted', text: "This is a separate script from Kura's bridge. It only reads prices and runs the paper bot; it can't place real orders." })),
+    card('Money', null,
+      h('div', { class: 'grid2' },
+        numField('Starting money ($)', c.capital, v => saveCfg({ capital: Math.max(100, v) }), { id: 'capital', min: 100, step: 100 }),
+        numField('Monthly top-up ($)', c.topup, v => saveCfg({ topup: v }), { id: 'topup', step: 50 }),
+        numField('Brokerage (%)', +(c.costs.feePct * 100).toFixed(3), v => saveCfg({ costs: Object.assign({}, c.costs, { feePct: v / 100 }) }), { step: 0.01 }),
+        numField('Minimum fee ($)', c.costs.feeMin, v => saveCfg({ costs: Object.assign({}, c.costs, { feeMin: v }) }), { step: 1 }),
+        numField('Slippage (%)', +(c.costs.slip * 100).toFixed(3), v => saveCfg({ costs: Object.assign({}, c.costs, { slip: v / 100 }) }), { step: 0.01 })),
+      h('p', { class: 'muted', text: 'Set brokerage to what your broker charges for ASX trades. Slippage allows for buying a little above, and selling a little below, the opening price.' })),
+    card('Rules', null,
+      h('details', null, h('summary', null, h('span', { class: 'dot', 'data-s': 'trend' }), 'Trend filter'),
+        h('div', { class: 'grid2' }, numField('Average (days)', p.trend.sma, v => setP('trend', 'sma', Math.max(5, Math.round(v)))), numField('Buffer (%)', p.trend.band * 100, v => setP('trend', 'band', v / 100), { step: 0.5 }))),
+      h('details', null, h('summary', null, h('span', { class: 'dot', 'data-s': 'monthly' }), 'Monthly invest'),
+        h('div', { class: 'grid2' }, numField('Rebalance past (%)', p.monthly.drift * 100, v => setP('monthly', 'drift', v / 100), { step: 1 }))),
+      h('details', null, h('summary', null, h('span', { class: 'dot', 'data-s': 'dip' }), 'Dip buying'),
+        h('div', { class: 'grid2' },
+          numField('Drop (%)', p.dip.drop * 100, v => setP('dip', 'drop', v / 100), { step: 0.5 }), numField('From the high of (days)', p.dip.lookback, v => setP('dip', 'lookback', Math.max(2, Math.round(v)))),
+          numField('Trend average (days)', p.dip.trend, v => setP('dip', 'trend', Math.max(5, Math.round(v)))), numField('Sell above average (days)', p.dip.exitSma, v => setP('dip', 'exitSma', Math.max(2, Math.round(v)))),
+          numField('Sell after (days)', p.dip.maxDays, v => setP('dip', 'maxDays', Math.max(1, Math.round(v)))), numField('Stop-loss (%)', p.dip.stop * 100, v => setP('dip', 'stop', v / 100), { step: 0.5 }))),
+      h('div', { class: 'row' }, h('button', { class: 'link', type: 'button', onclick: () => saveCfg({ params: {} }) }, 'Reset the rules')),
+      h('p', { class: 'muted', text: 'Tuning the rules until the past looks great is the easiest way to fool yourself: a rule that only works on the history it was tuned on usually fails on new prices.' })),
+    card('Benchmark and alerts', null,
+      h('div', { class: 'grid2' }, (() => { const i = h('input', { value: c.bench, id: 'bench', maxlength: 8, autocapitalize: 'characters' }); i.addEventListener('change', () => { const v = i.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (v) { saveCfg({ bench: v }, true).then(() => loadBars()); } }); return h('label', { class: 'field' }, h('span', { class: 'lbl', text: 'Benchmark (ASX code)' }), i); })()),
+      (() => { const cb = h('input', { type: 'checkbox', id: 'email' }); cb.checked = c.email !== false; cb.addEventListener('change', () => saveCfg({ email: cb.checked })); return h('label', { class: 'check' }, cb, 'Email me after the close when the bot trades or has orders for tomorrow'); })()),
+    card('Paper trading', h('span', { class: 'lbl', text: c.paperStart ? 'since ' + shortDay(c.paperStart) : 'off' }),
+      h('div', { class: 'row' },
+        c.paperStart ? h('button', { class: 'btn', type: 'button', onclick: confirmRestart }, 'Restart from today') : h('button', { class: 'btn primary', type: 'button', onclick: startPaper, disabled: !lastDate() }, 'Start paper trading'),
+        c.paperStart ? h('button', { class: 'btn danger', type: 'button', onclick: () => saveCfg({ paperStart: null }, true) }, 'Stop') : null)),
+    NATIVE ? appCard() : null,
+    card('About', h('span', { class: 'lbl', text: 'Kabu ' + APP_VERSION }),
+      h('p', { class: 'muted', text: 'Kabu is a tool for testing ideas with paper money. It is not financial advice, and past results do not predict future returns. Prices come from Yahoo Finance through your bridge and can be late or wrong.' }),
+      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => openHelp() }, 'How it works'))),
+  ];
+}
+
+// ---------- sheets ----------
+function openSheet(title, body, foot) {
+  S.sheet = h('div', { class: 'scrim', onclick: e => { if (e.target === e.currentTarget) closeSheet(); } },
+    h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+      h('div', { class: 'sheet-head' }, h('h2', { text: title }), h('span', { class: 'grow' }), h('button', { class: 'ghost', type: 'button', 'aria-label': 'Close', onclick: closeSheet }, icon('close'))),
+      h('div', { class: 'sheet-body' }, body), foot || null));
+  document.body.append(S.sheet);
+  after.splice(0).forEach(f => f());
+}
+function closeSheet() { if (S.sheet) S.sheet.remove(); S.sheet = null; }
+function openStrategy(k, mode) {
+  const r = results(mode);
+  if (!r) return;
+  const x = r[k], m = x.metrics;
+  const pos = Object.entries(x.positions);
+  openSheet(NAME[k] + (mode === 'paper' ? ' · paper' : ' · backtest'), [
+    h('p', { class: 'muted', text: SHORT[k] }),
+    h('ul', { style: 'margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px' }, RULES[k]().map(t => h('li', { text: t }))),
+    h('dl', { class: 'kv' },
+      h('dt', { text: 'Value' }), h('dd', { text: money(m.final) }),
+      h('dt', { text: 'Profit' }), h('dd', { class: sgn(m.profit), text: money(m.profit) + ' (' + pct(m.ret) + ')' }),
+      m.cagr != null ? [h('dt', { text: 'A year' }), h('dd', { text: pct(m.cagr) })] : null,
+      h('dt', { text: 'Worst fall' }), h('dd', { text: pct(-m.maxDD) }),
+      h('dt', { text: 'Trades · fees' }), h('dd', { text: m.trades + ' · ' + money(m.fees) }),
+      m.winRate != null ? [h('dt', { text: 'Winning trades' }), h('dd', { text: Math.round(m.winRate * 100) + '% of ' + m.roundTrips })] : null,
+      h('dt', { text: 'Dividends' }), h('dd', { text: money(m.dividends) })),
+    h('span', { class: 'lbl', text: `Holding (${pos.length}) · cash ${money(x.cash)}` }),
+    pos.length ? h('table', { class: 'tbl' }, h('thead', null, h('tr', null, h('th', { text: 'Stock' }), h('th', { text: 'Shares' }), h('th', { text: 'Value' }), h('th', { text: 'Gain' }))),
+      h('tbody', null, pos.map(([t, p]) => h('tr', { class: 'click', onclick: () => { closeSheet(); openStock(t, k); } }, h('td', null, h('b', { class: 'mono', text: t })), h('td', { text: String(p.qty) }), h('td', { text: money(p.value) }), h('td', { class: sgn(p.pnl), text: money(p.pnl) })))))
+      : h('p', { class: 'muted', text: 'All in cash.' }),
+    x.next.length ? [h('span', { class: 'lbl', text: 'Orders for the next open' }), h('div', { class: 'orders' }, x.next.map(orderRow))] : null,
+    h('span', { class: 'lbl', text: 'Latest trades' }),
+    x.trades.length ? h('div', { class: 'log' }, x.trades.slice(-12).reverse().map(tradeRow)) : h('p', { class: 'muted', text: 'No trades yet.' }),
+  ]);
+}
+function openStock(t, strat) {
+  if (strat) S.stockStrat = strat;
+  const data = dataFor(), s = data.tickers[t];
+  if (!s) return;
+  const render = () => {
+    const n = data.dates.length, from = Math.max(0, n - 260);
+    const a200 = E.sma(s.cf, 200);
+    const r = results('paper') || results('bt');
+    const trades = r ? r[S.stockStrat].trades.filter(x => x.t === t && x.d >= data.dates[from]) : [];
+    const pts = data.dates.slice(from).map((d, i) => ({ d, v: s.cf[from + i] }));
+    const marks = trades.map(x => ({ i: data.dates.indexOf(x.d) - from, v: x.px, side: x.side }));
+    const c = s.cf[n - 1], hi = Math.max(...s.cf.slice(from).filter(v => v != null));
+    return [
+      h('div', { class: 'hero-line' }, h('span', { class: 'big', text: '$' + c.toFixed(2) }), h('span', { class: 'mono ' + sgn(c - s.cf[n - 2]), text: pct(c / s.cf[n - 2] - 1) }), h('span', { class: 'muted', text: 'close ' + dayLabel(data.dates[n - 1]) })),
+      chart([{ key: 'px', label: t, c: 'var(--ink)', pts }, { key: 'avg', label: '200d', c: 'var(--ink-2)', thin: true, dash: true, pts: data.dates.slice(from).map((d, i) => ({ d, v: a200[from + i] })) }], { h: 220, fmt: v => '$' + v.toFixed(v < 10 ? 2 : 0), marks, label: `${t} over the last year with its 200-day average` }),
+      h('div', { class: 'legend' }, h('span', null, h('i', { class: 'ln', style: '--c:var(--ink)' }), t), h('span', null, h('i', { class: 'ln dash', style: '--c:var(--ink-2)' }), '200-day average'), h('span', null, '▲ buy  ▼ sell')),
+      h('div', { class: 'chips' }, E.STRATS.map(k => h('button', { class: 'chip', type: 'button', 'data-s': k, 'aria-pressed': String(S.stockStrat === k), onclick: () => { S.stockStrat = k; const b = $('.sheet-body', S.sheet); b.replaceChildren(...render().flat(3).filter(Boolean)); after.splice(0).forEach(f => f()); } }, h('span', { class: 'dot' }), NAME[k]))),
+      h('dl', { class: 'kv' }, h('dt', { text: '1-year change' }), h('dd', { text: pct(c / s.cf[from] - 1) }), h('dt', { text: 'Below its 1-year high' }), h('dd', { text: pct(c / hi - 1) }), h('dt', { text: 'vs 200-day average' }), h('dd', { text: a200[n - 1] ? pct(c / a200[n - 1] - 1) : '—' })),
+      trades.length ? h('div', { class: 'log' }, trades.slice().reverse().map(tradeRow)) : h('p', { class: 'muted', text: `No ${NAME[S.stockStrat].toLowerCase()} trades in ${t} in the last year (${results('paper') ? 'paper' : 'backtest'}).` }),
+    ];
+  };
+  openSheet(t, render());
+}
+function openHelp() {
+  openSheet('How Kabu works', h('div', { class: 'help', style: 'display:flex;flex-direction:column;gap:10px' },
+    h('h3', { text: 'What it does' }),
+    h('p', { text: 'Kabu runs three simple trading rules on real ASX prices. The Compare tab shows what they would have done over the past years. Paper trading then runs them forward from the day you start, with pretend money, so you see how they behave on prices nobody had seen when you switched it on.' }),
+    h('h3', { text: 'The three strategies' }),
+    ...E.STRATS.map(k => h('p', null, h('b', { text: NAME[k] + '. ' }), RULES[k]().join(' '))),
+    h('p', { text: `Each is compared with simply buying and holding ${S.cfg.bench} (an ASX 200 fund).` }),
+    h('h3', { text: 'How trades are counted' }),
+    h('p', { text: 'Rules are checked after each close; orders fill at the next morning\'s open, plus slippage and brokerage. Whole shares only. Dividends are paid in cash on the ex-date. Returns are time-weighted, so monthly top-ups don\'t count as profit.' }),
+    h('h3', { text: 'The bot and the daily email' }),
+    h('p', { text: 'Your bridge (a Google Apps Script in your account) runs after every ASX close on weekdays, updates prices, runs the rules on your paper money and emails you when something was bought or sold, or is due tomorrow. It never places real orders.' }),
+    h('h3', { text: 'Be careful with results' }),
+    h('p', { text: `Costs matter more than they look: with ${money(S.cfg.capital)} spread over ${S.cfg.tickers.length} stocks, each position is about ${money(S.cfg.capital / Math.max(1, S.cfg.tickers.length))}, so a ${money(S.cfg.costs.feeMin)} minimum fee is ${(S.cfg.costs.feeMin / (S.cfg.capital / Math.max(1, S.cfg.tickers.length)) * 100).toFixed(1)}% of every trade. Strategies that trade often pay that again and again.` }),
+    h('p', { text: 'Backtests flatter: the rules were chosen knowing roughly how markets went. A strategy that beats the index on paper for a few months has not proven much. Most people who trade actively do worse than buying and holding an index fund. This is a tool for learning, not financial advice.' })));
+}
+
+// ---------- actions ----------
+function startPaper() {
+  saveCfg({ paperStart: sydToday() }, true);
+  toast('Paper trading starts at today\'s close. The bot places its first paper orders then.');
+}
+function confirmRestart() {
+  openSheet('Restart paper trading?', [
+    h('p', { text: 'Paper trading will begin again from today with ' + money(S.cfg.capital) + '. The current paper results are replaced (they are always recalculated from the start date).' }),
+    h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', id: 'confirm-restart', onclick: () => { closeSheet(); startPaper(); } }, 'Restart from today'), h('button', { class: 'btn', type: 'button', onclick: closeSheet }, 'Cancel')),
+  ]);
+}
+async function runNow() {
+  toast('Running the bot…');
+  try { const j = await bridge('run'); S.status = j.status; toast(j.status && j.status.error ? 'The bot hit a problem: ' + brMsg({ message: j.status.error }) : 'The bot ran' + (j.status && j.status.emailed ? ' and emailed you.' : '.')); await loadBars(true); }
+  catch (e) { toast(brMsg(e)); }
+  draw();
+}
+const bridgeText = () => BRIDGE_SRC.replace('__SECRET__', S.br.secret);
+async function copyText(text) {
+  if (NATIVE && native('copy', text)) return true;
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; }
+}
+async function copyScript() {
+  if (await copyText(bridgeText())) toast('Bridge script copied. Paste it into Apps Script, over the old code if you have one.');
+  else toast("Couldn't copy here. Use Share it instead.");
+}
+async function testBridge(u) {
+  const url = normUrl(u);
+  if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(url)) { toast('Paste the Web app URL from Apps Script: it starts with https://script.google.com/macros/s/ and ends in /exec.'); return; }
+  S.br.url = url;
+  S.br.useGet = false;
+  saveBr();
+  toast('Testing the bridge…');
+  try {
+    const j = await bridge('hello');
+    S.trigger = j.trigger;
+    S.brVersion = j.version || 1;
+    // the bridge keeps the settings the bot uses: send this phone's
+    const k = await bridge('config', { set: Object.assign({}, S.cfg, { appUrl: siteUrl() }) });
+    S.cfg = Object.assign({}, DEFAULT_CFG, k.config);
+    ls.set('kabu.cfg', S.cfg);
+    toast(j.trigger ? 'Connected. Loading prices…' : 'Connected. Run setupKabu once in Apps Script to switch on the daily bot.');
+    draw();
+    await loadBars();
+    loadStatus();
+  } catch (e) { toast(brMsg(e)); draw(); }
+}
+function exportCsv(list, src) {
+  const rows = [['date', 'strategy', 'stock', 'side', 'shares', 'price', 'value', 'fee', 'reason']].concat(list.map(t => [t.d, NAME[t.strategy], t.t, t.side, t.qty, t.px, t.value, t.fee, t.why]));
+  const csv = rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(',')).join('\n');
+  const name = `kabu-${src === 'paper' ? 'paper' : 'backtest-' + S.period}-trades.csv`;
+  if (NATIVE) { native('saveFile', name, 'text/csv', csv); return; }
+  const a = h('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `kabu-${src === 'paper' ? 'paper' : 'backtest-' + S.period}-trades.csv` });
+  document.body.append(a); a.click(); a.remove();
+}
+let toastT = null;
+function toast(msg) {
+  let t = $('#toast');
+  if (!t) { t = h('div', { class: 'toast', id: 'toast', role: 'status' }); document.body.append(t); }
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toastT);
+  toastT = setTimeout(() => { t.hidden = true; }, 4200);
+}
+
+// ---------- updates (Android app) and bridge updates ----------
+function bridgeUpdateNote() {
+  return h('div', { class: 'notice', id: 'bridge-update' },
+    h('b', { text: `Bridge update: v${S.brVersion} → v${BRIDGE_VERSION}` }),
+    h('ol', { class: 'steps' },
+      h('li', null, 'Tap ', h('b', { text: 'Copy bridge script' }), ' below.'),
+      h('li', { text: 'In Apps Script, select all the old code, paste over it and save.' }),
+      h('li', null, h('b', { text: 'Deploy → Manage deployments' }), ', tap the pencil, set Version to ', h('b', { text: 'New version' }), ', then Deploy. The URL stays the same, and your paper trading carries on.')),
+    h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: copyScript }, 'Copy bridge script')));
+}
+function updateBanner() {
+  const u = S.update;
+  if (!NATIVE || !u) return null;
+  if (u.state === 'ready') return h('section', { class: 'notice', id: 'update-ready' },
+    h('b', { text: `Kabu ${u.name} is ready` }), u.notes ? h('p', { class: 'muted', text: u.notes }) : null,
+    h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', id: 'apply-update', onclick: () => native('applyUpdate') }, 'Restart to update')));
+  if (u.state === 'shell') return h('section', { class: 'notice warn' },
+    h('b', { text: `Kabu ${u.name} needs a newer app` }), h('p', { class: 'muted', text: 'Install the latest APK from the kabu-android releases on GitHub, over the top of this one. Your data stays.' }),
+    u.apk ? h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => native('openUrl', u.apk) }, 'Open releases')) : null);
+  if (u.state === 'rolledback') return h('section', { class: 'notice warn' }, h('b', { text: `The update to ${u.name} didn't start, so Kabu went back to ${APP_VERSION}.` }), h('p', { class: 'muted', text: 'It will not try that version again. A fixed version will install as usual.' }));
+  return null;
+}
+function appCard() {
+  const i = nativeInfo() || {}, u = S.update || {};
+  const when = i.lastCheck ? new Date(i.lastCheck).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'never';
+  const line = u.state === 'checking' ? 'Checking…' : u.state === 'none' ? `Up to date (${APP_VERSION}).` : u.state === 'ready' ? `${u.name} downloaded and ready.` : u.state === 'error' ? "Couldn't check: " + (u.error || 'no connection') : `Last checked ${when}.`;
+  const site = h('input', { id: 'site-url', type: 'url', value: i.site || '', autocomplete: 'off', placeholder: 'https://YOURNAME.github.io/kabu/' });
+  site.addEventListener('change', () => { const v = site.value.trim(); if (/^https:\/\/[^\s]+\/$/.test(v)) { native('setSite', v); toast('Update address saved.'); } else { site.value = i.site || ''; toast('Use the full address of your Kabu site, ending in /'); } });
+  return card('App updates', h('span', { class: 'lbl', id: 'app-ver', text: `${APP_VERSION} · app ${i.shellName || i.shell || ''}` }),
+    h('p', { class: 'muted', id: 'update-line', text: line }),
+    h('div', { class: 'row' },
+      u.state === 'ready' ? h('button', { class: 'btn primary', type: 'button', onclick: () => native('applyUpdate') }, 'Restart to update')
+        : h('button', { class: 'btn', type: 'button', id: 'check-update', disabled: u.state === 'checking', onclick: () => { S.update = { state: 'checking' }; draw(); native('checkForUpdate'); } }, 'Check for updates')),
+    h('details', null, h('summary', null, h('span', { class: 'muted', text: 'Where updates come from' })),
+      h('div', { class: 'stack' }, h('p', { class: 'muted', text: 'Kabu checks your Kabu website for a newer version.json, downloads index.html, checks it matches, and switches to it next time it starts. If a new version fails to start, it goes back automatically.' }),
+        h('label', { class: 'field' }, h('span', { class: 'lbl', text: 'Kabu website' }), site))));
+}
+addEventListener('kabu-native', e => {
+  const d = (e && e.detail) || {};
+  if (d.type !== 'update') return;
+  const was = S.update && S.update.state;
+  S.update = d;
+  if (d.state === 'ready' && was !== 'ready') toast(`Kabu ${d.name} is ready. Restart to update.`);
+  if (S.tab === 'settings' || S.right === 'settings' || d.state !== 'none') draw();
+});
+// Android back button: close a sheet, then go back to Home, then let the app close
+window.kabuBack = () => {
+  if (S.sheet) { closeSheet(); return true; }
+  if (innerWidth < 720 && S.tab !== 'home') { go('home'); return true; }
+  return false;
+};
+
+// ---------- layout ----------
+const TABS = [['home', 'Home'], ['compare', 'Compare'], ['stocks', 'Stocks'], ['log', 'Trades'], ['settings', 'Settings']];
+const VIEWS = { home: viewHome, compare: viewCompare, stocks: viewStocks, log: viewLog, settings: viewSettings };
+function go(tab) {
+  if (innerWidth >= 720 && tab !== 'home') { S.right = tab; ls.set('kabu.right', tab); }
+  S.tab = tab;
+  ls.set('kabu.tab', tab);
+  draw();
+  scrollTo(0, 0);
+}
+function draw() {
+  const wide = innerWidth >= 720;
+  const app = $('#app');
+  const top = h('header', { class: 'top' },
+    h('span', { class: 'brand' }, 'KABU', h('small', { text: '株' })),
+    h('span', { class: 'pill', text: 'PAPER' }),
+    h('span', { class: 'grow' }),
+    lastDate() ? h('span', { class: 'lbl', text: shortDay(lastDate()) }) : null,
+    h('button', { class: 'ghost' + (S.busy ? ' spin' : ''), type: 'button', id: 'refresh', 'aria-label': 'Refresh prices', onclick: () => { loadBars(true); loadStatus(); } }, icon('refresh')),
+    h('button', { class: 'ghost', type: 'button', 'aria-label': 'How it works', onclick: () => openHelp() }, icon('help')));
+  let panes;
+  if (wide) {
+    const r = S.right === 'home' ? 'compare' : S.right;
+    panes = [h('div', { class: 'pane', id: 'pane-home' }, VIEWS.home()),
+      h('div', { class: 'pane', id: 'pane-right' }, h('nav', { class: 'rtabs', role: 'tablist' }, TABS.slice(1).map(([k, l]) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(r === k), onclick: () => go(k) }, l))), VIEWS[r]())];
+  } else {
+    panes = [h('div', { class: 'pane', id: 'pane-main' }, VIEWS[S.tab] ? VIEWS[S.tab]() : VIEWS.home())];
+  }
+  const tabs = h('nav', { class: 'tabs', role: 'tablist', 'aria-label': 'Sections' }, TABS.map(([k, l]) => h('button', { class: 'tab', type: 'button', role: 'tab', id: 'tab-' + k, 'aria-selected': String(S.tab === k), onclick: () => go(k) }, icon(k === 'log' ? 'log' : k === 'settings' ? 'gear' : k), l)));
+  app.replaceChildren(top, h('main', { class: 'panes' }, panes), tabs);
+  after.splice(0).forEach(f => f());
+}
+let rT = null;
+addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(draw, 120); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.sheet) closeSheet(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && normUrl(S.br.url)) { loadBars(); loadStatus(); } });
+
+async function boot() {
+  const cached = await idb.get('bars');
+  if (cached && cached.bars) { S.bars = cached.bars; S.barsAt = cached.at || 0; }
+  draw();
+  if (NATIVE) { const u = native('updateState'); if (u) { try { S.update = JSON.parse(u); } catch (e) {} } native('ready', APP_VERSION); draw(); }
+  if (normUrl(S.br.url)) { await loadStatus(); await loadBars(); }
+  if (!NATIVE && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+window.__kabu = { S, E, results, draw };
+boot();
+})();
+</script>
+</body>
+</html>
